@@ -18,7 +18,24 @@
 	display: block;
 }
 
-/* Step 1: industry icon grid */
+/* Step 1: industry icon grid - the one "dark, cinematic" moment in the
+   browser; steps 2/3 stay light/white like the rest of the site. */
+.gemz-browser-step[data-step="industry"] {
+	position: relative;
+	overflow: hidden;
+	background:
+		radial-gradient(ellipse at 50% -10%, rgba(124, 58, 237, 0.35) 0%, rgba(47, 111, 237, 0) 45%),
+		linear-gradient(180deg, #0B1220 0%, #05070C 100%);
+	border-radius: 28px;
+	padding: 48px 28px 40px;
+	box-shadow: 0 24px 60px rgba(11, 18, 32, 0.35);
+}
+
+.gemz-browser-step[data-step="industry"] h2 {
+	color: #ffffff;
+	text-align: center;
+}
+
 .gemz-industry-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
