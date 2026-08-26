@@ -16,6 +16,7 @@ class GRC_Industries {
 			'plumbing'      => 'Plumbing',
 			'remodeling'    => 'Remodeling',
 			'windows_doors' => 'Windows & Doors',
+			'tiny_modular_homes' => 'Tiny & Modular Homes',
 		);
 	}
 

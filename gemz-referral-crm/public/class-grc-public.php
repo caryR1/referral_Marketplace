@@ -187,6 +187,7 @@ class GRC_Public {
 			'plumbing'      => '<path d="M7 4v6a3 3 0 003 3h0a3 3 0 003-3V4"/><path d="M13 13v3a4 4 0 01-4 4H7"/><circle cx="17" cy="17" r="3"/>',
 			'remodeling'    => '<path d="M14.5 3.5l6 6-9 9H5.5v-6l9-9z"/><path d="M12 6l6 6"/>',
 			'windows_doors' => '<rect x="3" y="3" width="8" height="18" rx="1"/><path d="M7 3v18"/><rect x="14" y="3" width="7" height="18" rx="1"/><path d="M14 12h7"/>',
+			'tiny_modular_homes' => '<path d="M3 14L8 9h8l5 5"/><path d="M5 12v7h14v-7"/><circle cx="8" cy="20" r="1.5"/><circle cx="16" cy="20" r="1.5"/>',
 		);
 		return $paths[ $industry ] ?? $paths['roofing'];
 	}
