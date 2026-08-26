@@ -31,8 +31,8 @@ if ( ! empty( $_GET['edit'] ) ) {
 				<th><label for="industry">Industry</label></th>
 				<td>
 					<select id="industry" name="industry">
-						<?php foreach ( array( 'roofing', 'hvac', 'solar', 'plumbing', 'remodeling' ) as $ind ) : ?>
-							<option value="<?php echo esc_attr( $ind ); ?>" <?php selected( $editing->industry ?? '', $ind ); ?>><?php echo esc_html( ucfirst( $ind ) ); ?></option>
+						<?php foreach ( GRC_Industries::all() as $ind => $label ) : ?>
+							<option value="<?php echo esc_attr( $ind ); ?>" <?php selected( $editing->industry ?? '', $ind ); ?>><?php echo esc_html( $label ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</td>
@@ -72,6 +72,20 @@ if ( ! empty( $_GET['edit'] ) ) {
 				<td><textarea id="payout_notes" name="payout_notes" class="large-text" rows="3"><?php echo esc_textarea( $editing->payout_notes ?? '' ); ?></textarea></td>
 			</tr>
 			<tr>
+				<th>Service Areas</th>
+				<td>
+					<table id="grc-service-areas" class="widefat" style="max-width:600px;">
+						<thead>
+							<tr><th>State</th><th>City (optional)</th><th>Zip (optional)</th><th></th></tr>
+						</thead>
+						<tbody></tbody>
+					</table>
+					<p><button type="button" class="button" id="grc-add-service-area">Add Coverage Area</button></p>
+					<p class="description">Add a state alone to cover the whole state, or narrow it with a city or zip. A partner needs at least one row to ever show up in the industry browser or coverage search.</p>
+					<input type="hidden" id="service_areas" name="service_areas" value="<?php echo esc_attr( $editing->service_areas ?? '[]' ); ?>">
+				</td>
+			</tr>
+			<tr>
 				<th><label for="status">Status</label></th>
 				<td>
 					<select id="status" name="status">
@@ -85,23 +99,75 @@ if ( ! empty( $_GET['edit'] ) ) {
 		<?php submit_button( $editing ? 'Update Partner' : 'Add Partner' ); ?>
 	</form>
 
+	<script>
+	( function () {
+		var hidden = document.getElementById( 'service_areas' );
+		var body   = document.querySelector( '#grc-service-areas tbody' );
+
+		function escapeAttr( value ) {
+			return String( value || '' ).replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' ).replace( /</g, '&lt;' );
+		}
+
+		function addRow( area ) {
+			area = area || {};
+			var tr = document.createElement( 'tr' );
+			tr.innerHTML =
+				'<td><input type="text" class="grc-area-state" maxlength="2" style="text-transform:uppercase;width:4em;" value="' + escapeAttr( area.state ) + '"></td>' +
+				'<td><input type="text" class="grc-area-city" value="' + escapeAttr( area.city ) + '"></td>' +
+				'<td><input type="text" class="grc-area-zip" maxlength="10" value="' + escapeAttr( area.zip ) + '"></td>' +
+				'<td><button type="button" class="button-link grc-remove-area">Remove</button></td>';
+			body.appendChild( tr );
+		}
+
+		document.getElementById( 'grc-add-service-area' ).addEventListener( 'click', function () {
+			addRow();
+		} );
+
+		body.addEventListener( 'click', function ( e ) {
+			if ( e.target.classList.contains( 'grc-remove-area' ) ) {
+				e.target.closest( 'tr' ).remove();
+			}
+		} );
+
+		document.querySelector( 'form' ).addEventListener( 'submit', function () {
+			var areas = [];
+			body.querySelectorAll( 'tr' ).forEach( function ( tr ) {
+				var state = tr.querySelector( '.grc-area-state' ).value.trim();
+				var city  = tr.querySelector( '.grc-area-city' ).value.trim();
+				var zip   = tr.querySelector( '.grc-area-zip' ).value.trim();
+				if ( state || city || zip ) {
+					areas.push( { state: state, city: city, zip: zip } );
+				}
+			} );
+			hidden.value = JSON.stringify( areas );
+		} );
+
+		try {
+			var initial = JSON.parse( hidden.value || '[]' );
+			initial.forEach( addRow );
+		} catch ( e ) {}
+	} )();
+	</script>
+
 	<hr>
 
 	<h2>All Partners</h2>
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
-				<th>Name</th><th>Industry</th><th>Phone</th><th>Payout</th><th>Status</th><th>Actions</th>
+				<th>Name</th><th>Industry</th><th>Coverage</th><th>Phone</th><th>Payout</th><th>Status</th><th>Actions</th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php if ( empty( $partners ) ) : ?>
-				<tr><td colspan="6">No partners yet - add your first one above.</td></tr>
+				<tr><td colspan="7">No partners yet - add your first one above.</td></tr>
 			<?php endif; ?>
 			<?php foreach ( $partners as $p ) : ?>
+				<?php $areas = json_decode( $p->service_areas ?? '', true ); ?>
 				<tr>
 					<td><?php echo esc_html( $p->name ); ?></td>
-					<td><?php echo esc_html( ucfirst( $p->industry ) ); ?></td>
+					<td><?php echo esc_html( GRC_Industries::label( $p->industry ) ); ?></td>
+					<td><?php echo empty( $areas ) ? '<span style="color:#a00;">None set</span>' : esc_html( count( $areas ) . ' area' . ( count( $areas ) === 1 ? '' : 's' ) ); ?></td>
 					<td><?php echo esc_html( $p->phone ); ?></td>
 					<td>$<?php echo esc_html( number_format( (float) $p->payout_amount, 2 ) ); ?> (<?php echo esc_html( $p->payout_type ); ?>)</td>
 					<td><?php echo esc_html( ucfirst( $p->status ) ); ?></td>

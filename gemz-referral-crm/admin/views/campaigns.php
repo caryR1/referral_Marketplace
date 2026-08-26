@@ -58,7 +58,7 @@ $pages = get_posts( array(
 					<select id="partner_id" name="partner_id" required>
 						<option value="">— Select Partner —</option>
 						<?php foreach ( $partners as $p ) : ?>
-							<option value="<?php echo esc_attr( $p->id ); ?>" data-industry="<?php echo esc_attr( $p->industry ); ?>" <?php selected( $editing->partner_id ?? '', $p->id ); ?>><?php echo esc_html( $p->name . ' (' . ucfirst( $p->industry ) . ')' ); ?></option>
+							<option value="<?php echo esc_attr( $p->id ); ?>" data-industry="<?php echo esc_attr( $p->industry ); ?>" <?php selected( $editing->partner_id ?? '', $p->id ); ?>><?php echo esc_html( $p->name . ' (' . GRC_Industries::label( $p->industry ) . ')' ); ?></option>
 						<?php endforeach; ?>
 					</select>
 					<p class="description">Note: partner_id will need to be entered manually into the <code>[gemz_appointment_form]</code> shortcode when you build the landing page - see the Partner ID shown in the campaign list below.</p>
@@ -68,8 +68,8 @@ $pages = get_posts( array(
 				<th><label for="industry">Industry</label></th>
 				<td>
 					<select id="industry" name="industry">
-						<?php foreach ( array( 'roofing', 'hvac', 'solar', 'plumbing', 'remodeling' ) as $ind ) : ?>
-							<option value="<?php echo esc_attr( $ind ); ?>" <?php selected( $editing->industry ?? '', $ind ); ?>><?php echo esc_html( ucfirst( $ind ) ); ?></option>
+						<?php foreach ( GRC_Industries::all() as $ind => $label ) : ?>
+							<option value="<?php echo esc_attr( $ind ); ?>" <?php selected( $editing->industry ?? '', $ind ); ?>><?php echo esc_html( $label ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</td>

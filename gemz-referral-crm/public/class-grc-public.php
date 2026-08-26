@@ -181,11 +181,12 @@ class GRC_Public {
 	 */
 	private static function industry_icon_svg( $industry ) {
 		$paths = array(
-			'roofing'    => '<path d="M3 12L12 5l9 7"/><path d="M5 10v9h14v-9"/><path d="M9 19v-6h6v6"/>',
-			'hvac'       => '<circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/>',
-			'solar'      => '<rect x="3" y="7" width="8" height="6" rx="1"/><rect x="13" y="7" width="8" height="6" rx="1"/><path d="M7 13v3M17 13v3M4 21h16"/>',
-			'plumbing'   => '<path d="M7 4v6a3 3 0 003 3h0a3 3 0 003-3V4"/><path d="M13 13v3a4 4 0 01-4 4H7"/><circle cx="17" cy="17" r="3"/>',
-			'remodeling' => '<path d="M14.5 3.5l6 6-9 9H5.5v-6l9-9z"/><path d="M12 6l6 6"/>',
+			'roofing'       => '<path d="M3 12L12 5l9 7"/><path d="M5 10v9h14v-9"/><path d="M9 19v-6h6v6"/>',
+			'hvac'          => '<circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/>',
+			'solar'         => '<rect x="3" y="7" width="8" height="6" rx="1"/><rect x="13" y="7" width="8" height="6" rx="1"/><path d="M7 13v3M17 13v3M4 21h16"/>',
+			'plumbing'      => '<path d="M7 4v6a3 3 0 003 3h0a3 3 0 003-3V4"/><path d="M13 13v3a4 4 0 01-4 4H7"/><circle cx="17" cy="17" r="3"/>',
+			'remodeling'    => '<path d="M14.5 3.5l6 6-9 9H5.5v-6l9-9z"/><path d="M12 6l6 6"/>',
+			'windows_doors' => '<rect x="3" y="3" width="8" height="18" rx="1"/><path d="M7 3v18"/><rect x="14" y="3" width="7" height="18" rx="1"/><path d="M14 12h7"/>',
 		);
 		return $paths[ $industry ] ?? $paths['roofing'];
 	}
@@ -199,13 +200,7 @@ class GRC_Public {
 	 * so it lands as an organic/direct lead rather than agent-credited.
 	 */
 	public static function render_industry_browser( $atts ) {
-		$industries = array(
-			'roofing'    => 'Roofing',
-			'hvac'       => 'HVAC',
-			'solar'      => 'Solar',
-			'plumbing'   => 'Plumbing',
-			'remodeling' => 'Remodeling',
-		);
+		$industries = GRC_Industries::all();
 
 		ob_start();
 		?>

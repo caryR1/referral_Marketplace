@@ -2,8 +2,10 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Multi-level commission split: 70% direct agent (tier 1), 20% their
- * sponsor (tier 2), 10% sponsor's sponsor (tier 3).
+ * Multi-level commission split: tier 1 = direct agent, tier 2 = their
+ * sponsor, tier 3 = sponsor's sponsor. Percentages are configurable from
+ * Referral CRM -> Settings (stored in the grc_commission_split option);
+ * DEFAULT_SPLIT below is only the fallback for a fresh install.
  *
  * If a tier has no agent above it in the chain (e.g. a tier-1 agent
  * with no sponsor at all), that tier's share is simply not created as
@@ -14,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class GRC_Commissions {
 
-	const SPLIT = array(
+	const DEFAULT_SPLIT = array(
 		1 => 0.70,
 		2 => 0.20,
 		3 => 0.10,
@@ -22,6 +24,24 @@ class GRC_Commissions {
 
 	public static function init() {
 		add_action( 'grc_lead_marked_completed', array( __CLASS__, 'calculate_for_lead' ), 10, 1 );
+	}
+
+	/**
+	 * Reads the configured split from options, falling back to
+	 * DEFAULT_SPLIT if it's missing or malformed (e.g. before Settings
+	 * has ever been saved).
+	 */
+	public static function get_split() {
+		$saved = get_option( 'grc_commission_split', array() );
+		if ( ! is_array( $saved ) || empty( $saved[1] ) ) {
+			return self::DEFAULT_SPLIT;
+		}
+
+		$split = array();
+		foreach ( array( 1, 2, 3 ) as $tier ) {
+			$split[ $tier ] = isset( $saved[ $tier ] ) ? (float) $saved[ $tier ] : 0.0;
+		}
+		return $split;
 	}
 
 	/**
@@ -72,9 +92,10 @@ class GRC_Commissions {
 			$tier++;
 		}
 
-		$now = current_time( 'mysql' );
+		$split = self::get_split();
+		$now   = current_time( 'mysql' );
 		foreach ( $chain as $tier_num => $agent ) {
-			$pct    = self::SPLIT[ $tier_num ];
+			$pct    = $split[ $tier_num ] ?? 0.0;
 			$amount = round( $base_amount * $pct, 2 );
 
 			$wpdb->insert( $commissions_table, array(

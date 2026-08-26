@@ -9,6 +9,8 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_reset_test_data', array( __CLASS__, 'handle_reset_database' ) );
 		add_action( 'admin_post_grc_update_lead_status', array( __CLASS__, 'handle_update_lead_status' ) );
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
+		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
+		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
 	}
 
 	public static function register_menu() {
@@ -93,6 +95,7 @@ class GRC_Admin {
 			'phone'         => sanitize_text_field( $_POST['phone'] ?? '' ),
 			'email'         => sanitize_email( $_POST['email'] ?? '' ),
 			'website'       => esc_url_raw( $_POST['website'] ?? '' ),
+			'service_areas' => self::sanitize_service_areas( $_POST['service_areas'] ?? '' ),
 			'payout_amount' => floatval( $_POST['payout_amount'] ?? 0 ),
 			'payout_type'   => sanitize_text_field( $_POST['payout_type'] ?? 'flat' ),
 			'payout_notes'  => sanitize_textarea_field( $_POST['payout_notes'] ?? '' ),
@@ -120,6 +123,40 @@ class GRC_Admin {
 
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&saved=1' ) );
 		exit;
+	}
+
+	/**
+	 * Sanitizes the JSON posted by the service-areas repeatable-row UI on
+	 * the Partners screen into a clean {state,city,zip} array, dropping
+	 * any row with no state/city/zip and any state that isn't a 2-letter
+	 * code. Never trust JS-built JSON from a form as already clean.
+	 */
+	private static function sanitize_service_areas( $raw_json ) {
+		$decoded = json_decode( wp_unslash( (string) $raw_json ), true );
+		if ( empty( $decoded ) || ! is_array( $decoded ) ) {
+			return wp_json_encode( array() );
+		}
+
+		$clean = array();
+		foreach ( $decoded as $area ) {
+			if ( ! is_array( $area ) ) {
+				continue;
+			}
+			$state = strtoupper( sanitize_text_field( $area['state'] ?? '' ) );
+			$city  = sanitize_text_field( $area['city'] ?? '' );
+			$zip   = sanitize_text_field( $area['zip'] ?? '' );
+
+			if ( '' === $state && '' === $city && '' === $zip ) {
+				continue;
+			}
+			if ( '' !== $state && ! preg_match( '/^[A-Z]{2}$/', $state ) ) {
+				continue; // not a valid 2-letter state code, drop the row rather than store garbage
+			}
+
+			$clean[] = array( 'state' => $state, 'city' => $city, 'zip' => $zip );
+		}
+
+		return wp_json_encode( $clean );
 	}
 
 	/**
@@ -176,6 +213,75 @@ class GRC_Admin {
 	}
 
 	/**
+	 * Saves the configurable commission split (Settings screen). The three
+	 * tier percentages must be non-negative and sum to 100 - a split that
+	 * doesn't add up to the whole payout is a silent bug waiting to
+	 * shortchange or overpay agents, so it's rejected outright rather than
+	 * saved and left for someone to notice later.
+	 */
+	public static function handle_save_commission_split() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_save_commission_split' );
+
+		$tier1 = max( 0, (float) ( $_POST['tier1_pct'] ?? 0 ) );
+		$tier2 = max( 0, (float) ( $_POST['tier2_pct'] ?? 0 ) );
+		$tier3 = max( 0, (float) ( $_POST['tier3_pct'] ?? 0 ) );
+		$total = $tier1 + $tier2 + $tier3;
+
+		if ( abs( $total - 100.0 ) > 0.01 ) {
+			wp_die( 'Tier percentages must add up to 100. You entered ' . esc_html( $total ) . '. Go back and try again.' );
+		}
+
+		update_option( 'grc_commission_split', array(
+			1 => round( $tier1 / 100, 4 ),
+			2 => round( $tier2 / 100, 4 ),
+			3 => round( $tier3 / 100, 4 ),
+		) );
+
+		self::audit_log( 'settings', 0, 'commission_split_updated', array(
+			'tier1_pct' => $tier1, 'tier2_pct' => $tier2, 'tier3_pct' => $tier3,
+		) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-settings&split_saved=1' ) );
+		exit;
+	}
+
+	/**
+	 * Saves WhatsApp provider settings (Twilio). Credentials are stored
+	 * as plugin options - same trust level as any other WP plugin secret
+	 * (e.g. an SMTP password), not a dedicated secrets store. Once these
+	 * are filled in, GRC_Notifications::maybe_send_whatsapp_via_twilio() (hooked
+	 * to the grc_send_whatsapp filter) starts actually sending instead of
+	 * just logging intent.
+	 */
+	public static function handle_save_whatsapp_settings() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_save_whatsapp_settings' );
+
+		update_option( 'grc_whatsapp_provider', sanitize_text_field( $_POST['whatsapp_provider'] ?? 'none' ) );
+		update_option( 'grc_whatsapp_twilio_sid', sanitize_text_field( $_POST['twilio_sid'] ?? '' ) );
+
+		// Only overwrite the stored auth token if a new one was actually typed -
+		// the field is rendered blank for security, so an empty submit means
+		// "leave it as-is", not "clear it".
+		if ( ! empty( $_POST['twilio_auth_token'] ) ) {
+			update_option( 'grc_whatsapp_twilio_auth_token', sanitize_text_field( wp_unslash( $_POST['twilio_auth_token'] ) ) );
+		}
+		update_option( 'grc_whatsapp_twilio_from', sanitize_text_field( $_POST['twilio_from'] ?? '' ) );
+
+		self::audit_log( 'settings', 0, 'whatsapp_settings_updated', array(
+			'provider' => sanitize_text_field( $_POST['whatsapp_provider'] ?? 'none' ),
+		) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-settings&whatsapp_saved=1' ) );
+		exit;
+	}
+
+	/**
 	 * Explicit, confirmed reset of all plugin tables. Only for dev/testing.
 	 * Requires a checked confirmation checkbox in the settings screen form,
 	 * on top of the capability check and nonce - three separate guards
@@ -201,7 +307,7 @@ class GRC_Admin {
 	/**
 	 * Updates a lead's status. When moved to 'completed', fires
 	 * grc_lead_marked_completed so GRC_Commissions can calculate the
-	 * 70/20/10 split - kept as a hook rather than a direct call so other
+	 * configured tier split - kept as a hook rather than a direct call so other
 	 * things (e.g. a future "project completed" customer notification)
 	 * can also listen without this method needing to know about them.
 	 */

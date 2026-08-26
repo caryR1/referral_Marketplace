@@ -28,11 +28,14 @@ class GRC_Notifications {
 			$body     = self::render( $template['body'], $data );
 			$sent     = wp_mail( $recipient_ref, $subject, $body );
 		} elseif ( 'whatsapp' === $channel ) {
-			// TODO: wire to WhatsApp Business API / provider (e.g. Twilio, Meta Cloud API)
-			// once the account is set up. For now this is a stub that logs intent
-			// so the workflow is provably complete end-to-end before the real
-			// integration is dropped in.
-			$sent = apply_filters( 'grc_send_whatsapp', false, $recipient_ref, $event_key, $data );
+			$template = self::resolve_template( $event_key );
+			$message  = self::render( $template['body'], $data );
+
+			// grc_send_whatsapp lets any provider hook in; self::maybe_send_whatsapp_via_twilio()
+			// below is the built-in Twilio implementation, wired at priority 10. It stays a
+			// no-op (returns $sent unchanged) until Settings -> WhatsApp has real credentials,
+			// so this is safe to leave connected even before an account exists.
+			$sent = apply_filters( 'grc_send_whatsapp', false, $recipient_ref, $event_key, $data, $message );
 		}
 
 		self::log( $event_key, $recipient_type, $recipient_ref, $channel, $related_lead_id, $sent ? 'sent' : 'failed' );
@@ -125,6 +128,46 @@ class GRC_Notifications {
 		}, $text );
 	}
 
+	/**
+	 * Built-in Twilio WhatsApp sender, hooked to grc_send_whatsapp. Stays
+	 * inert (returns $sent unchanged) unless Settings -> WhatsApp has
+	 * "Twilio" selected with an Account SID, Auth Token, and From number
+	 * saved - so it's safe to leave wired up before that account exists.
+	 * $recipient_ref is expected to be an E.164 phone number (e.g. +1954...).
+	 */
+	public static function maybe_send_whatsapp_via_twilio( $sent, $recipient_ref, $event_key, $data, $message ) {
+		if ( 'twilio' !== get_option( 'grc_whatsapp_provider', 'none' ) ) {
+			return $sent;
+		}
+
+		$sid   = get_option( 'grc_whatsapp_twilio_sid', '' );
+		$token = get_option( 'grc_whatsapp_twilio_auth_token', '' );
+		$from  = get_option( 'grc_whatsapp_twilio_from', '' );
+
+		if ( empty( $sid ) || empty( $token ) || empty( $from ) || empty( $recipient_ref ) ) {
+			return $sent;
+		}
+
+		$response = wp_remote_post( "https://api.twilio.com/2010-04-01/Accounts/{$sid}/Messages.json", array(
+			'timeout'   => 15,
+			'headers'   => array(
+				'Authorization' => 'Basic ' . base64_encode( "{$sid}:{$token}" ),
+			),
+			'body'      => array(
+				'From' => 'whatsapp:' . $from,
+				'To'   => 'whatsapp:' . $recipient_ref,
+				'Body' => $message,
+			),
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		return $code >= 200 && $code < 300;
+	}
+
 	private static function log( $event_key, $recipient_type, $recipient_ref, $channel, $related_lead_id, $status ) {
 		global $wpdb;
 		$wpdb->insert(
@@ -141,3 +184,5 @@ class GRC_Notifications {
 		);
 	}
 }
+
+add_filter( 'grc_send_whatsapp', array( 'GRC_Notifications', 'maybe_send_whatsapp_via_twilio' ), 10, 5 );
