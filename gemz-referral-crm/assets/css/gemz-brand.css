@@ -1,0 +1,68 @@
+/* ==========================================================================
+   Gemz Referral CRM — brand tokens
+   Futuristic, bright, sophisticated-not-childish. Blue/gray/white/black
+   base with a sky-blue glow accent for the "shine" moments.
+   ========================================================================== */
+
+:root {
+	--gemz-navy:        #0B1220;
+	--gemz-deep-blue:   #1E3A6E;
+	--gemz-blue:        #2F6FED;
+	--gemz-blue-dark:   #2559C4;
+	--gemz-glow:        #4FD1F9;
+	--gemz-slate:       #64748B;
+	--gemz-slate-light: #94A3B8;
+	--gemz-line:        #E2E6EA;
+	--gemz-bg:          #F4F7FB;
+	--gemz-white:       #FFFFFF;
+
+	--gemz-font-display: 'Sora', 'Segoe UI', sans-serif;
+	--gemz-font-body:    'Inter', 'Segoe UI', sans-serif;
+
+	--gemz-radius:       14px;
+	--gemz-radius-sm:    8px;
+	--gemz-shadow:       0 4px 18px rgba(11, 18, 32, 0.08);
+	--gemz-shadow-lg:    0 12px 32px rgba(11, 18, 32, 0.14);
+}
+
+/* Glossy badge — the signature element: a rounded-square icon container
+   with a gradient body and a light diagonal sheen, reused everywhere an
+   industry or feature needs an icon. This is what carries the
+   "bright, polished, Pixar-ish but sophisticated" feel without any
+   borrowed imagery. */
+.gemz-badge {
+	position: relative;
+	width: 64px;
+	height: 64px;
+	border-radius: 18px;
+	background: linear-gradient(145deg, var(--gemz-blue), var(--gemz-deep-blue));
+	box-shadow: 0 6px 16px rgba(47, 111, 237, 0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.gemz-badge::after {
+	content: '';
+	position: absolute;
+	top: -30%;
+	left: -20%;
+	width: 60%;
+	height: 160%;
+	background: linear-gradient(120deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 60%);
+	transform: rotate(20deg);
+	pointer-events: none;
+}
+
+.gemz-badge svg {
+	width: 30px;
+	height: 30px;
+	position: relative;
+	z-index: 1;
+	stroke: #ffffff;
+	fill: none;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}

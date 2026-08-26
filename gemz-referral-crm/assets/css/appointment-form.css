@@ -1,0 +1,80 @@
+.grc-appointment-form-wrap {
+	max-width: 480px;
+	margin: 0 auto;
+	background: #ffffff;
+	border: 1px solid #e2e6ea;
+	border-radius: 12px;
+	padding: 28px;
+	box-shadow: 0 4px 18px rgba(20, 30, 50, 0.08);
+}
+
+.grc-appointment-form .grc-field {
+	margin-bottom: 16px;
+	display: flex;
+	flex-direction: column;
+}
+
+.grc-appointment-form label {
+	font-size: 13px;
+	font-weight: 600;
+	color: #33404f;
+	margin-bottom: 6px;
+	letter-spacing: 0.02em;
+}
+
+.grc-appointment-form input,
+.grc-appointment-form select {
+	padding: 11px 14px;
+	border: 1px solid #cdd5df;
+	border-radius: 8px;
+	font-size: 15px;
+	color: #1a2330;
+	background: #f8fafc;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.grc-appointment-form input:focus,
+.grc-appointment-form select:focus {
+	outline: none;
+	border-color: #2f6fed;
+	box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15);
+	background: #ffffff;
+}
+
+.grc-submit-btn {
+	width: 100%;
+	padding: 13px 20px;
+	background: #2f6fed;
+	color: #ffffff;
+	border: none;
+	border-radius: 8px;
+	font-size: 16px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.grc-submit-btn:hover {
+	background: #2559c4;
+}
+
+.grc-submit-btn:disabled {
+	background: #9db3d6;
+	cursor: not-allowed;
+}
+
+.grc-form-message {
+	margin-top: 14px;
+	font-size: 14px;
+	text-align: center;
+}
+
+.grc-form-message.grc-success {
+	color: #1a7a4c;
+	font-weight: 600;
+}
+
+.grc-form-message.grc-error {
+	color: #c0392b;
+	font-weight: 600;
+}

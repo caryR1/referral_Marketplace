@@ -1,0 +1,256 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+class GRC_Admin {
+
+	public static function init() {
+		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
+		add_action( 'admin_post_grc_save_partner', array( __CLASS__, 'handle_save_partner' ) );
+		add_action( 'admin_post_grc_reset_test_data', array( __CLASS__, 'handle_reset_database' ) );
+		add_action( 'admin_post_grc_update_lead_status', array( __CLASS__, 'handle_update_lead_status' ) );
+		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
+	}
+
+	public static function register_menu() {
+		add_menu_page(
+			'Gemz Referral CRM',
+			'Referral CRM',
+			'grc_manage_partners',
+			'grc-dashboard',
+			array( __CLASS__, 'render_dashboard' ),
+			'dashicons-networking',
+			26
+		);
+
+		add_submenu_page( 'grc-dashboard', 'Dashboard', 'Dashboard', 'grc_manage_partners', 'grc-dashboard', array( __CLASS__, 'render_dashboard' ) );
+		add_submenu_page( 'grc-dashboard', 'Partners', 'Partners', 'grc_manage_partners', 'grc-partners', array( __CLASS__, 'render_partners' ) );
+		add_submenu_page( 'grc-dashboard', 'Campaigns', 'Campaigns', 'grc_manage_campaigns', 'grc-campaigns', array( __CLASS__, 'render_campaigns' ) );
+		add_submenu_page( 'grc-dashboard', 'Leads', 'Leads', 'grc_manage_leads', 'grc-leads', array( __CLASS__, 'render_leads' ) );
+		add_submenu_page( 'grc-dashboard', 'Agents', 'Agents', 'grc_manage_agents', 'grc-agents', array( __CLASS__, 'render_agents' ) );
+		add_submenu_page( 'grc-dashboard', 'Reports', 'Reports', 'grc_view_reports', 'grc-reports', array( __CLASS__, 'render_reports' ) );
+		add_submenu_page( 'grc-dashboard', 'Email Templates', 'Email Templates', 'manage_options', 'grc-email-templates', array( __CLASS__, 'render_email_templates' ) );
+		add_submenu_page( 'grc-dashboard', 'Notification Log', 'Notification Log', 'grc_view_audit_log', 'grc-notification-log', array( __CLASS__, 'render_notification_log' ) );
+		add_submenu_page( 'grc-dashboard', 'Audit Log', 'Audit Log', 'grc_view_audit_log', 'grc-audit', array( __CLASS__, 'render_audit_log' ) );
+		add_submenu_page( 'grc-dashboard', 'Settings', 'Settings', 'grc_manage_partners', 'grc-settings', array( __CLASS__, 'render_settings' ) );
+	}
+
+	public static function render_dashboard() {
+		include GRC_PLUGIN_DIR . 'admin/views/dashboard.php';
+	}
+
+	public static function render_partners() {
+		include GRC_PLUGIN_DIR . 'admin/views/partners.php';
+	}
+
+	public static function render_campaigns() {
+		include GRC_PLUGIN_DIR . 'admin/views/campaigns.php';
+	}
+
+	public static function render_leads() {
+		include GRC_PLUGIN_DIR . 'admin/views/leads.php';
+	}
+
+	public static function render_agents() {
+		include GRC_PLUGIN_DIR . 'admin/views/agents.php';
+	}
+
+	public static function render_reports() {
+		include GRC_PLUGIN_DIR . 'admin/views/reports.php';
+	}
+
+	public static function render_email_templates() {
+		include GRC_PLUGIN_DIR . 'admin/views/email-templates.php';
+	}
+
+	public static function render_notification_log() {
+		include GRC_PLUGIN_DIR . 'admin/views/notification-log.php';
+	}
+
+	public static function render_audit_log() {
+		include GRC_PLUGIN_DIR . 'admin/views/audit-log.php';
+	}
+
+	public static function render_settings() {
+		include GRC_PLUGIN_DIR . 'admin/views/settings.php';
+	}
+
+	/**
+	 * Handles the partner add/edit form submission.
+	 */
+	public static function handle_save_partner() {
+		if ( ! current_user_can( 'grc_manage_partners' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_save_partner' );
+
+		global $wpdb;
+		$now = current_time( 'mysql' );
+
+		$data = array(
+			'name'          => sanitize_text_field( $_POST['name'] ?? '' ),
+			'industry'      => sanitize_text_field( $_POST['industry'] ?? '' ),
+			'contact_name'  => sanitize_text_field( $_POST['contact_name'] ?? '' ),
+			'phone'         => sanitize_text_field( $_POST['phone'] ?? '' ),
+			'email'         => sanitize_email( $_POST['email'] ?? '' ),
+			'website'       => esc_url_raw( $_POST['website'] ?? '' ),
+			'payout_amount' => floatval( $_POST['payout_amount'] ?? 0 ),
+			'payout_type'   => sanitize_text_field( $_POST['payout_type'] ?? 'flat' ),
+			'payout_notes'  => sanitize_textarea_field( $_POST['payout_notes'] ?? '' ),
+			'status'        => sanitize_text_field( $_POST['status'] ?? 'active' ),
+			'updated_at'    => $now,
+		);
+
+		$partner_id = absint( $_POST['partner_id'] ?? 0 );
+		$table       = GRC_DB::table( 'partners' );
+
+		if ( $partner_id ) {
+			$result = $wpdb->update( $table, $data, array( 'id' => $partner_id ) );
+			if ( false === $result ) {
+				wp_die( 'Database error saving partner: ' . esc_html( $wpdb->last_error ) );
+			}
+			self::audit_log( 'partner', $partner_id, 'updated', $data );
+		} else {
+			$data['created_at'] = $now;
+			$result = $wpdb->insert( $table, $data );
+			if ( false === $result ) {
+				wp_die( 'Database error saving partner: ' . esc_html( $wpdb->last_error ) );
+			}
+			self::audit_log( 'partner', $wpdb->insert_id, 'created', $data );
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&saved=1' ) );
+		exit;
+	}
+
+	/**
+	 * Saves a campaign (name, partner, industry, landing page, tracking slug).
+	 * The tracking slug is what makes the ready-to-send link -
+	 * refer.gemzonline.com/go/{slug} - so it must be unique and URL-safe.
+	 */
+	public static function handle_save_campaign() {
+		if ( ! current_user_can( 'grc_manage_campaigns' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_save_campaign' );
+
+		global $wpdb;
+		$now = current_time( 'mysql' );
+		$table = GRC_DB::table( 'campaigns' );
+
+		$slug = sanitize_title( $_POST['tracking_slug'] ?? '' );
+		if ( empty( $slug ) ) {
+			wp_die( 'Tracking slug is required and must be URL-safe.' );
+		}
+
+		$campaign_id = absint( $_POST['campaign_id'] ?? 0 );
+
+		// Enforce uniqueness of the slug (excluding this campaign's own row when editing).
+		$existing = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$table} WHERE tracking_slug = %s AND id != %d", $slug, $campaign_id
+		) );
+		if ( $existing ) {
+			wp_die( 'That tracking slug is already used by another campaign. Choose a different one.' );
+		}
+
+		$data = array(
+			'name'            => sanitize_text_field( $_POST['name'] ?? '' ),
+			'partner_id'      => absint( $_POST['partner_id'] ?? 0 ),
+			'industry'        => sanitize_text_field( $_POST['industry'] ?? '' ),
+			'landing_page_id' => absint( $_POST['landing_page_id'] ?? 0 ) ?: null,
+			'tracking_slug'   => $slug,
+			'status'          => sanitize_text_field( $_POST['status'] ?? 'active' ),
+			'updated_at'      => $now,
+		);
+
+		if ( $campaign_id ) {
+			$wpdb->update( $table, $data, array( 'id' => $campaign_id ) );
+			self::audit_log( 'campaign', $campaign_id, 'updated', $data );
+		} else {
+			$data['created_at'] = $now;
+			$wpdb->insert( $table, $data );
+			self::audit_log( 'campaign', $wpdb->insert_id, 'created', $data );
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-campaigns&saved=1' ) );
+		exit;
+	}
+
+	/**
+	 * Explicit, confirmed reset of all plugin tables. Only for dev/testing.
+	 * Requires a checked confirmation checkbox in the settings screen form,
+	 * on top of the capability check and nonce - three separate guards
+	 * against ever nuking production data by accident.
+	 */
+	public static function handle_reset_database() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_reset_test_data' );
+
+		if ( empty( $_POST['confirm_reset'] ) || 'yes' !== $_POST['confirm_reset'] ) {
+			wp_die( 'Reset not confirmed.' );
+		}
+
+		GRC_Deactivator::drop_all_tables();
+		GRC_Activator::create_tables();
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-settings&reset=1' ) );
+		exit;
+	}
+
+	/**
+	 * Updates a lead's status. When moved to 'completed', fires
+	 * grc_lead_marked_completed so GRC_Commissions can calculate the
+	 * 70/20/10 split - kept as a hook rather than a direct call so other
+	 * things (e.g. a future "project completed" customer notification)
+	 * can also listen without this method needing to know about them.
+	 */
+	public static function handle_update_lead_status() {
+		if ( ! current_user_can( 'grc_manage_leads' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_update_lead_status' );
+
+		global $wpdb;
+		$lead_id = absint( $_POST['lead_id'] ?? 0 );
+		$new_status = sanitize_text_field( $_POST['status'] ?? '' );
+		$allowed = array( 'new', 'sent_to_partner', 'accepted', 'in_progress', 'completed', 'lost', 'stale' );
+
+		if ( ! $lead_id || ! in_array( $new_status, $allowed, true ) ) {
+			wp_die( 'Invalid request.' );
+		}
+
+		$table = GRC_DB::table( 'leads' );
+		$wpdb->update( $table, array(
+			'status'                 => $new_status,
+			'last_partner_update_at' => current_time( 'mysql' ),
+			'updated_at'             => current_time( 'mysql' ),
+		), array( 'id' => $lead_id ) );
+
+		self::audit_log( 'lead', $lead_id, 'status_changed', array( 'new_status' => $new_status ) );
+
+		if ( 'completed' === $new_status ) {
+			do_action( 'grc_lead_marked_completed', $lead_id );
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-leads&updated=1' ) );
+		exit;
+	}
+
+	public static function audit_log( $object_type, $object_id, $action, $details = array() ) {
+		global $wpdb;
+		$wpdb->insert(
+			GRC_DB::table( 'audit_log' ),
+			array(
+				'user_id'    => get_current_user_id(),
+				'object_type'=> $object_type,
+				'object_id'  => $object_id,
+				'action'     => $action,
+				'details'    => wp_json_encode( $details ),
+				'created_at' => current_time( 'mysql' ),
+			)
+		);
+	}
+}
+
+GRC_Admin::init();

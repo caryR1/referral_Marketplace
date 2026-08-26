@@ -1,0 +1,114 @@
+.gemz-portal {
+	max-width: 680px;
+	margin: 0 auto;
+	font-family: var(--gemz-font-body);
+	color: var(--gemz-navy);
+}
+
+.gemz-portal h3 {
+	font-family: var(--gemz-font-display);
+	margin-top: 32px;
+}
+
+.gemz-portal-notice {
+	background: var(--gemz-bg);
+	border-radius: var(--gemz-radius);
+	padding: 20px;
+	color: var(--gemz-slate);
+}
+
+.gemz-portal-success {
+	background: #E6F7EF;
+	color: #1A7A4C;
+	padding: 12px 16px;
+	border-radius: var(--gemz-radius-sm);
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.gemz-portal-hint {
+	color: var(--gemz-slate);
+	font-size: 13px;
+	margin-top: -8px;
+}
+
+.gemz-portal-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+	gap: 12px;
+	margin: 20px 0;
+}
+
+.gemz-stat-card {
+	background: var(--gemz-white);
+	border: 1px solid var(--gemz-line);
+	border-radius: var(--gemz-radius);
+	padding: 16px;
+	box-shadow: var(--gemz-shadow);
+}
+
+.gemz-stat-label {
+	display: block;
+	font-size: 12px;
+	color: var(--gemz-slate);
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+.gemz-stat-value {
+	display: block;
+	font-family: var(--gemz-font-display);
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--gemz-navy);
+}
+
+.gemz-stat-value.gemz-code {
+	font-size: 16px;
+	color: var(--gemz-blue);
+	letter-spacing: 0.03em;
+}
+
+.gemz-payment-form {
+	background: var(--gemz-white);
+	border: 1px solid var(--gemz-line);
+	border-radius: var(--gemz-radius);
+	padding: 24px;
+	box-shadow: var(--gemz-shadow);
+}
+
+.gemz-payment-form label {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--gemz-slate);
+	margin-bottom: 6px;
+	margin-top: 14px;
+}
+
+.gemz-payment-form label:first-of-type {
+	margin-top: 0;
+}
+
+.gemz-payment-form input,
+.gemz-payment-form select {
+	width: 100%;
+	padding: 11px 14px;
+	border: 1px solid var(--gemz-line);
+	border-radius: var(--gemz-radius-sm);
+	font-size: 15px;
+	background: var(--gemz-bg);
+	box-sizing: border-box;
+}
+
+.gemz-payment-form input:focus,
+.gemz-payment-form select:focus {
+	outline: none;
+	border-color: var(--gemz-blue);
+	box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15);
+	background: var(--gemz-white);
+}
+
+.gemz-payment-form .gemz-btn {
+	margin-top: 20px;
+}
