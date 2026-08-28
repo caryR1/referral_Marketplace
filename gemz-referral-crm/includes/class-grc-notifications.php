@@ -15,7 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Event keys currently wired:
  *   agent_signup, appointment_booked, appointment_changed,
  *   lead_accepted_by_partner, milestone_reached, project_completed,
- *   payout_ready, payout_sent, lead_stale, new_lead_for_partner
+ *   payout_ready, payout_sent, lead_stale, new_lead_for_partner,
+ *   customer_cashback_ready, customer_payout_sent
  */
 class GRC_Notifications {
 
@@ -111,6 +112,14 @@ class GRC_Notifications {
 			'new_lead_for_partner' => array(
 				'subject' => 'New referral received',
 				'body'    => "You have a new referral: {{customer_name}}, preferred contact {{preferred_contact}}, requested appointment {{appointment_date}}.",
+			),
+			'customer_cashback_ready' => array(
+				'subject' => 'Your cash back is ready to claim',
+				'body'    => "Hi {{customer_name}},\n\nYour project is complete, and your \${{amount}} cash back is ready! Claim it here:\n{{claim_url}}\n\n- The Gemz Team",
+			),
+			'customer_payout_sent' => array(
+				'subject' => 'Your cash back is on its way',
+				'body'    => "Hi {{customer_name}},\n\nYour cash back of \${{amount}} has been sent via {{payment_method}}. Thanks for booking through Gemz!\n\n- The Gemz Team",
 			),
 		);
 	}

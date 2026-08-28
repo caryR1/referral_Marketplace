@@ -11,6 +11,8 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
 		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
 		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
+		add_action( 'admin_post_grc_mark_customer_payout_paid', array( __CLASS__, 'handle_mark_customer_payout_paid' ) );
+		add_action( 'admin_post_grc_mark_commission_paid', array( __CLASS__, 'handle_mark_commission_paid' ) );
 	}
 
 	public static function register_menu() {
@@ -29,6 +31,7 @@ class GRC_Admin {
 		add_submenu_page( 'grc-dashboard', 'Campaigns', 'Campaigns', 'grc_manage_campaigns', 'grc-campaigns', array( __CLASS__, 'render_campaigns' ) );
 		add_submenu_page( 'grc-dashboard', 'Leads', 'Leads', 'grc_manage_leads', 'grc-leads', array( __CLASS__, 'render_leads' ) );
 		add_submenu_page( 'grc-dashboard', 'Agents', 'Agents', 'grc_manage_agents', 'grc-agents', array( __CLASS__, 'render_agents' ) );
+		add_submenu_page( 'grc-dashboard', 'Payouts', 'Payouts', 'grc_manage_commissions', 'grc-payouts', array( __CLASS__, 'render_payouts' ) );
 		add_submenu_page( 'grc-dashboard', 'Reports', 'Reports', 'grc_view_reports', 'grc-reports', array( __CLASS__, 'render_reports' ) );
 		add_submenu_page( 'grc-dashboard', 'Email Templates', 'Email Templates', 'manage_options', 'grc-email-templates', array( __CLASS__, 'render_email_templates' ) );
 		add_submenu_page( 'grc-dashboard', 'Notification Log', 'Notification Log', 'grc_view_audit_log', 'grc-notification-log', array( __CLASS__, 'render_notification_log' ) );
@@ -58,6 +61,10 @@ class GRC_Admin {
 
 	public static function render_reports() {
 		include GRC_PLUGIN_DIR . 'admin/views/reports.php';
+	}
+
+	public static function render_payouts() {
+		include GRC_PLUGIN_DIR . 'admin/views/payouts.php';
 	}
 
 	public static function render_email_templates() {
@@ -98,6 +105,7 @@ class GRC_Admin {
 			'service_areas' => self::sanitize_service_areas( $_POST['service_areas'] ?? '' ),
 			'payout_amount' => floatval( $_POST['payout_amount'] ?? 0 ),
 			'payout_type'   => sanitize_text_field( $_POST['payout_type'] ?? 'flat' ),
+			'customer_cashback_amount' => floatval( $_POST['customer_cashback_amount'] ?? 0 ),
 			'payout_notes'  => sanitize_textarea_field( $_POST['payout_notes'] ?? '' ),
 			'status'        => sanitize_text_field( $_POST['status'] ?? 'active' ),
 			'updated_at'    => $now,
@@ -340,6 +348,99 @@ class GRC_Admin {
 		}
 
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-leads&updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Marks a homeowner cash-back payout as actually sent. Only a row in
+	 * 'claimed' status can be marked paid - the homeowner has to have
+	 * submitted a payout method first, otherwise there's nowhere to have
+	 * sent money to. payout_reference is optional free text (e.g. a
+	 * PayPal transaction ID) for the admin's own record-keeping.
+	 */
+	public static function handle_mark_customer_payout_paid() {
+		if ( ! current_user_can( 'grc_manage_commissions' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_mark_customer_payout_paid' );
+
+		global $wpdb;
+		$payout_id = absint( $_POST['payout_id'] ?? 0 );
+		$table     = GRC_DB::table( 'customer_payouts' );
+
+		$payout = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $payout_id ) );
+		if ( ! $payout || 'claimed' !== $payout->status ) {
+			wp_die( 'This payout can\'t be marked paid yet - the homeowner hasn\'t submitted a payout method.' );
+		}
+
+		$reference = sanitize_text_field( $_POST['payout_reference'] ?? '' );
+		$wpdb->update( $table, array(
+			'status'           => 'paid',
+			'payout_reference' => $reference,
+			'paid_at'          => current_time( 'mysql' ),
+			'updated_at'       => current_time( 'mysql' ),
+		), array( 'id' => $payout_id ) );
+
+		$leads_table = GRC_DB::table( 'leads' );
+		$lead = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$leads_table} WHERE id = %d", $payout->lead_id ) );
+		if ( $lead && ! empty( $lead->customer_email ) ) {
+			GRC_Notifications::send( 'customer_payout_sent', 'customer', $lead->customer_email, 'email', array(
+				'customer_name'  => $lead->customer_name,
+				'amount'         => number_format( (float) $payout->amount, 2 ),
+				'payment_method' => ucfirst( $payout->payout_method ?: 'the method you provided' ),
+			), $payout->lead_id );
+		}
+
+		self::audit_log( 'customer_payout', $payout_id, 'marked_paid', array( 'reference' => $reference ) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-payouts&paid=1' ) );
+		exit;
+	}
+
+	/**
+	 * Marks an agent commission as paid - this is the one piece of the
+	 * agent payout flow that had no admin action at all before (the
+	 * commissions table's 'paid' status was write-only from nowhere).
+	 */
+	public static function handle_mark_commission_paid() {
+		if ( ! current_user_can( 'grc_manage_commissions' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_mark_commission_paid' );
+
+		global $wpdb;
+		$commission_id = absint( $_POST['commission_id'] ?? 0 );
+		$table         = GRC_DB::table( 'commissions' );
+
+		$commission = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $commission_id ) );
+		if ( ! $commission || 'ready' !== $commission->status ) {
+			wp_die( 'This commission isn\'t ready to be marked paid.' );
+		}
+
+		$reference = sanitize_text_field( $_POST['payout_reference'] ?? '' );
+		$wpdb->update( $table, array(
+			'status'           => 'paid',
+			'payout_reference' => $reference,
+			'paid_at'          => current_time( 'mysql' ),
+			'updated_at'       => current_time( 'mysql' ),
+		), array( 'id' => $commission_id ) );
+
+		$agents_table = GRC_DB::table( 'agents' );
+		$agent = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$agents_table} WHERE id = %d", $commission->agent_id ) );
+		if ( $agent ) {
+			$agent_user = get_userdata( $agent->user_id );
+			if ( $agent_user ) {
+				GRC_Notifications::send( 'payout_sent', 'agent', $agent_user->user_email, 'email', array(
+					'agent_name'     => $agent_user->display_name,
+					'amount'         => number_format( (float) $commission->amount, 2 ),
+					'payment_method' => ucfirst( $agent->payment_method ?: 'the method on file' ),
+				), $commission->lead_id );
+			}
+		}
+
+		self::audit_log( 'commission', $commission_id, 'marked_paid', array( 'reference' => $reference ) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-payouts&paid=1' ) );
 		exit;
 	}
 

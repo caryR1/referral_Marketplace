@@ -79,8 +79,9 @@ class GRC_Public {
 		$has_portal  = has_shortcode( $content, 'gemz_agent_dashboard' );
 		$has_signup  = has_shortcode( $content, 'gemz_agent_signup' );
 		$has_login   = has_shortcode( $content, 'gemz_agent_login' );
+		$has_claim   = has_shortcode( $content, 'gemz_claim_cashback' );
 
-		if ( ! $has_form && ! $has_browser && ! $has_portal && ! $has_signup && ! $has_login ) {
+		if ( ! $has_form && ! $has_browser && ! $has_portal && ! $has_signup && ! $has_login && ! $has_claim ) {
 			return;
 		}
 
@@ -126,6 +127,14 @@ class GRC_Public {
 			wp_localize_script( 'grc-agent-login', 'gemzAgentLogin', array(
 				'restUrl'      => esc_url_raw( rest_url( 'gemz-crm/v1/agents/login' ) ),
 				'dashboardUrl' => esc_url_raw( home_url( '/agent-portal/' ) ),
+			) );
+		}
+
+		if ( $has_claim ) {
+			wp_enqueue_script( 'grc-claim-cashback', GRC_PLUGIN_URL . 'assets/js/claim-cashback.js', array(), GRC_VERSION, true );
+			wp_enqueue_style( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/css/agent-portal.css', array( 'grc-brand-tokens' ), GRC_VERSION );
+			wp_localize_script( 'grc-claim-cashback', 'gemzClaimCashback', array(
+				'restUrl' => esc_url_raw( rest_url( 'gemz-crm/v1/cashback/claim' ) ),
 			) );
 		}
 	}

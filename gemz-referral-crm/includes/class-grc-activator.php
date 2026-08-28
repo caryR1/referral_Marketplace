@@ -35,6 +35,7 @@ class GRC_Activator {
 			service_areas LONGTEXT NULL COMMENT 'JSON: list of {state,city,zip} coverage entries',
 			payout_amount DECIMAL(10,2) DEFAULT 0,
 			payout_type VARCHAR(30) DEFAULT 'flat' COMMENT 'flat, percentage, tiered',
+			customer_cashback_amount DECIMAL(10,2) DEFAULT 0 COMMENT 'flat $ paid directly to the homeowner once their lead with this partner is marked completed - separate pool from payout_amount, which funds agent commissions',
 			payout_notes TEXT NULL COMMENT 'payout speed/hassle/terms notes',
 			status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, paused, dropped',
 			created_at DATETIME NOT NULL,
@@ -193,6 +194,33 @@ class GRC_Activator {
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY event_key (event_key)
+		) {$collate};";
+
+		// -------------------------------------------------------------
+		// CUSTOMER PAYOUTS - homeowner cash-back owed/claimed/paid per
+		// lead. Separate from COMMISSIONS (which pays agents) - this is
+		// the money promised directly to the homeowner on every landing
+		// page. No customer login exists, so claiming happens via a
+		// unique unguessable claim_token sent by email, not a session.
+		// -------------------------------------------------------------
+		$customer_payouts = GRC_DB::table( 'customer_payouts' );
+		$statements[] = "CREATE TABLE {$customer_payouts} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			lead_id BIGINT UNSIGNED NOT NULL,
+			amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+			status VARCHAR(20) NOT NULL DEFAULT 'ready' COMMENT 'ready (awaiting claim), claimed (payout method submitted), paid',
+			claim_token VARCHAR(64) NOT NULL,
+			payout_method VARCHAR(20) NULL COMMENT 'paypal, venmo, bank, check',
+			payout_details LONGTEXT NULL COMMENT 'JSON, customer-submitted via the claim page',
+			payout_reference VARCHAR(100) NULL,
+			claimed_at DATETIME NULL,
+			paid_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY lead_id (lead_id),
+			UNIQUE KEY claim_token (claim_token),
+			KEY status (status)
 		) {$collate};";
 
 		foreach ( $statements as $sql ) {

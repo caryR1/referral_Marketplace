@@ -68,6 +68,13 @@ if ( ! empty( $_GET['edit'] ) ) {
 				</td>
 			</tr>
 			<tr>
+				<th><label for="customer_cashback_amount">Customer Cash-Back Amount</label></th>
+				<td>
+					<input type="number" step="0.01" id="customer_cashback_amount" name="customer_cashback_amount" value="<?php echo esc_attr( $editing->customer_cashback_amount ?? '' ); ?>">
+					<p class="description">Flat $ paid directly to the homeowner once their lead with this partner is marked completed. Separate from Payout Amount above, which funds agent commissions. Leave at 0 if this partner doesn't fund a homeowner reward.</p>
+				</td>
+			</tr>
+			<tr>
 				<th><label for="payout_notes">Payout Notes</label></th>
 				<td><textarea id="payout_notes" name="payout_notes" class="large-text" rows="3"><?php echo esc_textarea( $editing->payout_notes ?? '' ); ?></textarea></td>
 			</tr>
@@ -155,12 +162,12 @@ if ( ! empty( $_GET['edit'] ) ) {
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
-				<th>Name</th><th>Industry</th><th>Coverage</th><th>Phone</th><th>Payout</th><th>Status</th><th>Actions</th>
+				<th>Name</th><th>Industry</th><th>Coverage</th><th>Phone</th><th>Agent Payout</th><th>Cash-Back</th><th>Status</th><th>Actions</th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php if ( empty( $partners ) ) : ?>
-				<tr><td colspan="7">No partners yet - add your first one above.</td></tr>
+				<tr><td colspan="8">No partners yet - add your first one above.</td></tr>
 			<?php endif; ?>
 			<?php foreach ( $partners as $p ) : ?>
 				<?php $areas = json_decode( $p->service_areas ?? '', true ); ?>
@@ -170,6 +177,7 @@ if ( ! empty( $_GET['edit'] ) ) {
 					<td><?php echo empty( $areas ) ? '<span style="color:#a00;">None set</span>' : esc_html( count( $areas ) . ' area' . ( count( $areas ) === 1 ? '' : 's' ) ); ?></td>
 					<td><?php echo esc_html( $p->phone ); ?></td>
 					<td>$<?php echo esc_html( number_format( (float) $p->payout_amount, 2 ) ); ?> (<?php echo esc_html( $p->payout_type ); ?>)</td>
+					<td>$<?php echo esc_html( number_format( (float) ( $p->customer_cashback_amount ?? 0 ), 2 ) ); ?></td>
 					<td><?php echo esc_html( ucfirst( $p->status ) ); ?></td>
 					<td><a href="<?php echo esc_url( admin_url( 'admin.php?page=grc-partners&edit=' . $p->id ) ); ?>">Edit</a></td>
 				</tr>

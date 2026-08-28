@@ -24,6 +24,15 @@ $commission_summary = $wpdb->get_row( "
 		SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS paid
 	FROM {$commissions_table}
 " );
+
+$customer_payouts_table = GRC_DB::table( 'customer_payouts' );
+$cashback_summary = $wpdb->get_row( "
+	SELECT
+		SUM(CASE WHEN status = 'ready' THEN amount ELSE 0 END) AS awaiting_claim,
+		SUM(CASE WHEN status = 'claimed' THEN amount ELSE 0 END) AS claimed,
+		SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS paid
+	FROM {$customer_payouts_table}
+" );
 ?>
 <div class="wrap">
 	<h1>Reports</h1>
@@ -34,6 +43,15 @@ $commission_summary = $wpdb->get_row( "
 			<tr><th>Owed</th><td>$<?php echo esc_html( number_format( (float) ( $commission_summary->owed ?? 0 ), 2 ) ); ?></td></tr>
 			<tr><th>Ready to Pay</th><td>$<?php echo esc_html( number_format( (float) ( $commission_summary->ready ?? 0 ), 2 ) ); ?></td></tr>
 			<tr><th>Paid</th><td>$<?php echo esc_html( number_format( (float) ( $commission_summary->paid ?? 0 ), 2 ) ); ?></td></tr>
+		</tbody>
+	</table>
+
+	<h2 style="margin-top:30px;">Homeowner Cash-Back Summary</h2>
+	<table class="wp-list-table widefat fixed striped" style="max-width:500px;">
+		<tbody>
+			<tr><th>Awaiting Claim</th><td>$<?php echo esc_html( number_format( (float) ( $cashback_summary->awaiting_claim ?? 0 ), 2 ) ); ?></td></tr>
+			<tr><th>Claimed (ready to pay)</th><td>$<?php echo esc_html( number_format( (float) ( $cashback_summary->claimed ?? 0 ), 2 ) ); ?></td></tr>
+			<tr><th>Paid</th><td>$<?php echo esc_html( number_format( (float) ( $cashback_summary->paid ?? 0 ), 2 ) ); ?></td></tr>
 		</tbody>
 	</table>
 

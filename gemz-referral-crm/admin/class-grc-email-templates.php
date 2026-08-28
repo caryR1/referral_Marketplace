@@ -28,6 +28,8 @@ class GRC_Email_Templates {
 			'payout_sent'              => array( 'agent_name', 'amount', 'payment_method' ),
 			'lead_stale'               => array( 'customer_name', 'partner_name' ),
 			'new_lead_for_partner'     => array( 'customer_name', 'preferred_contact', 'appointment_date' ),
+			'customer_cashback_ready'  => array( 'customer_name', 'amount', 'claim_url' ),
+			'customer_payout_sent'     => array( 'customer_name', 'amount', 'payment_method' ),
 		);
 		return $map[ $event_key ] ?? $common;
 	}
@@ -44,6 +46,8 @@ class GRC_Email_Templates {
 			'payout_sent'              => 'Payout sent',
 			'lead_stale'               => 'Lead gone stale',
 			'new_lead_for_partner'     => 'New lead notification to partner',
+			'customer_cashback_ready'  => 'Customer cash-back ready to claim',
+			'customer_payout_sent'     => 'Customer cash-back sent',
 		);
 	}
 
@@ -160,6 +164,7 @@ class GRC_Email_Templates {
 			'tier'               => '1',
 			'payment_method'     => 'Wise',
 			'preferred_contact'  => 'Phone',
+			'claim_url'          => home_url( '/claim-cashback/?token=sample' ),
 		);
 		$keys = self::variables_for( $event_key );
 		$sample = array();

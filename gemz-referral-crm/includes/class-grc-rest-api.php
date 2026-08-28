@@ -54,6 +54,70 @@ class GRC_REST_API {
 			'callback'            => array( __CLASS__, 'login_agent' ),
 			'permission_callback' => '__return_true', // public: this is the front-end login form
 		) );
+
+		register_rest_route( self::NAMESPACE_, '/cashback/claim', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'claim_cashback' ),
+			'permission_callback' => '__return_true', // public: the claim_token itself is the auth, no login exists for customers
+		) );
+	}
+
+	/**
+	 * Homeowner submits their payout method via the emailed claim link.
+	 * The claim_token is the sole credential - long/random enough (48 hex
+	 * chars) that guessing one is infeasible, same trust model as a
+	 * password-reset link. Only a row still in 'ready' status can be
+	 * claimed; already-claimed/paid rows return a clear, non-destructive
+	 * error rather than silently overwriting a prior submission.
+	 */
+	public static function claim_cashback( WP_REST_Request $request ) {
+		global $wpdb;
+		$params = $request->get_json_params();
+
+		$token = sanitize_text_field( $params['token'] ?? '' );
+		$method = sanitize_text_field( $params['payout_method'] ?? '' );
+		$allowed_methods = array( 'paypal', 'venmo', 'bank', 'check' );
+
+		if ( empty( $token ) || ! in_array( $method, $allowed_methods, true ) ) {
+			return new WP_Error( 'grc_invalid_claim', 'Please choose a payout method and try again.', array( 'status' => 400 ) );
+		}
+
+		$payout = GRC_Customer_Payouts::get_by_token( $token );
+		if ( ! $payout ) {
+			return new WP_Error( 'grc_claim_not_found', 'That claim link is invalid.', array( 'status' => 404 ) );
+		}
+		if ( 'ready' !== $payout->status ) {
+			return new WP_Error( 'grc_already_claimed', 'This cash-back reward has already been claimed.', array( 'status' => 409 ) );
+		}
+
+		$details = array();
+		if ( 'paypal' === $method ) {
+			$details['paypal_email'] = sanitize_email( $params['paypal_email'] ?? '' );
+		} elseif ( 'venmo' === $method ) {
+			$details['venmo_handle'] = sanitize_text_field( $params['venmo_handle'] ?? '' );
+		} elseif ( 'bank' === $method ) {
+			$details['bank_account_holder'] = sanitize_text_field( $params['bank_account_holder'] ?? '' );
+			$details['bank_account_number'] = sanitize_text_field( $params['bank_account_number'] ?? '' );
+			$details['bank_routing']        = sanitize_text_field( $params['bank_routing'] ?? '' );
+			$details['bank_name']           = sanitize_text_field( $params['bank_name'] ?? '' );
+		} elseif ( 'check' === $method ) {
+			$details['mailing_address'] = sanitize_textarea_field( $params['mailing_address'] ?? '' );
+		}
+
+		$table = GRC_DB::table( 'customer_payouts' );
+		$wpdb->update( $table, array(
+			'status'         => 'claimed',
+			'payout_method'  => $method,
+			'payout_details' => wp_json_encode( $details ),
+			'claimed_at'     => current_time( 'mysql' ),
+			'updated_at'     => current_time( 'mysql' ),
+		), array( 'id' => $payout->id ) );
+
+		if ( class_exists( 'GRC_Admin' ) ) {
+			GRC_Admin::audit_log( 'customer_payout', $payout->id, 'claimed', array( 'method' => $method ) );
+		}
+
+		return rest_ensure_response( array( 'success' => true ) );
 	}
 
 	/**
