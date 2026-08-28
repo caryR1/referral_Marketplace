@@ -38,11 +38,22 @@ class GRC_Activator {
 			customer_cashback_amount DECIMAL(10,2) DEFAULT 0 COMMENT 'flat $ paid directly to the homeowner once their lead with this partner is marked completed - separate pool from payout_amount, which funds agent commissions',
 			payout_notes TEXT NULL COMMENT 'payout speed/hassle/terms notes',
 			status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, paused, dropped',
+			outreach_status VARCHAR(20) NOT NULL DEFAULT 'new' COMMENT 'new, contacted, approved, rejected - onboarding pipeline stage, distinct from status (live/bookable)',
+			contacted_at DATETIME NULL,
+			rejection_reason TEXT NULL COMMENT 'required when outreach_status = rejected',
+			unusual_terms TEXT NULL COMMENT 'non-standard terms captured when approved, e.g. referral caps',
+			source_url VARCHAR(500) NULL COMMENT 'page the commission/payout terms were sourced from',
+			discovered_via VARCHAR(20) NOT NULL DEFAULT 'manual' COMMENT 'manual, research',
+			research_batch_id VARCHAR(40) NULL,
+			user_id BIGINT UNSIGNED NULL COMMENT 'FK to wp_users - lets this partner log in to their own dashboard; NULL until an account is created/linked',
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			KEY industry (industry),
-			KEY status (status)
+			KEY status (status),
+			KEY outreach_status (outreach_status),
+			KEY research_batch_id (research_batch_id),
+			KEY user_id (user_id)
 		) {$collate};";
 
 		// -------------------------------------------------------------
@@ -57,12 +68,29 @@ class GRC_Activator {
 			payment_method VARCHAR(20) NULL COMMENT 'wise, paypal, bank',
 			payment_details LONGTEXT NULL COMMENT 'JSON, agent-editable only, never admin-editable',
 			status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, suspended',
+			segment_id BIGINT UNSIGNED NULL COMMENT 'FK to grc_agent_segments - tagging only, no messaging logic yet',
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY referral_code (referral_code),
 			KEY user_id (user_id),
-			KEY sponsor_agent_id (sponsor_agent_id)
+			KEY sponsor_agent_id (sponsor_agent_id),
+			KEY segment_id (segment_id)
+		) {$collate};";
+
+		// -------------------------------------------------------------
+		// AGENT SEGMENTS - lightweight tagging for future targeted
+		// messaging; this table + the agents.segment_id FK are the whole
+		// feature for now, deliberately no send/campaign logic yet.
+		// -------------------------------------------------------------
+		$agent_segments = GRC_DB::table( 'agent_segments' );
+		$statements[] = "CREATE TABLE {$agent_segments} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			name VARCHAR(100) NOT NULL,
+			description TEXT NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY name (name)
 		) {$collate};";
 
 		// -------------------------------------------------------------

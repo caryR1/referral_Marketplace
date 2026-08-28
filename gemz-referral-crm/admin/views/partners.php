@@ -3,7 +3,14 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 global $wpdb;
 $table = GRC_DB::table( 'partners' );
-$partners = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY industry, name" );
+$leads_table = GRC_DB::table( 'leads' );
+$partners = $wpdb->get_results( "
+	SELECT p.*, (SELECT COUNT(*) FROM {$leads_table} WHERE partner_id = p.id) AS leads_sent
+	FROM {$table} p
+	ORDER BY FIELD(p.outreach_status, 'new', 'contacted', 'approved', 'rejected'), p.created_at DESC
+" );
+
+$latest_batch_id = $wpdb->get_var( "SELECT research_batch_id FROM {$table} WHERE research_batch_id IS NOT NULL ORDER BY created_at DESC LIMIT 1" );
 
 $editing = null;
 if ( ! empty( $_GET['edit'] ) ) {
@@ -15,6 +22,9 @@ if ( ! empty( $_GET['edit'] ) ) {
 
 	<?php if ( ! empty( $_GET['saved'] ) ) : ?>
 		<div class="notice notice-success"><p>Partner saved.</p></div>
+	<?php endif; ?>
+	<?php if ( ! empty( $_GET['outreach_updated'] ) ) : ?>
+		<div class="notice notice-success"><p>Partner outreach status updated.</p></div>
 	<?php endif; ?>
 
 	<h2><?php echo $editing ? 'Edit' : 'Add New'; ?> Partner</h2>
@@ -162,23 +172,95 @@ if ( ! empty( $_GET['edit'] ) ) {
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
-				<th>Name</th><th>Industry</th><th>Coverage</th><th>Phone</th><th>Agent Payout</th><th>Cash-Back</th><th>Status</th><th>Actions</th>
+				<th>Name</th><th>Industry</th><th>Coverage</th><th>Payout / Cash-Back</th><th>Leads Sent</th><th>Live Status</th><th>Outreach</th><th>Source</th><th>Pipeline Action</th><th></th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php if ( empty( $partners ) ) : ?>
-				<tr><td colspan="8">No partners yet - add your first one above.</td></tr>
+				<tr><td colspan="10">No partners yet - add your first one above.</td></tr>
 			<?php endif; ?>
-			<?php foreach ( $partners as $p ) : ?>
-				<?php $areas = json_decode( $p->service_areas ?? '', true ); ?>
+			<?php foreach ( $partners as $p ) :
+				$areas = json_decode( $p->service_areas ?? '', true );
+				$outreach = $p->outreach_status ?: 'new';
+				$is_new_batch = $p->research_batch_id && $latest_batch_id && $p->research_batch_id === $latest_batch_id;
+				$business_days = ( 'new' === $outreach ) ? GRC_Admin::business_days_since( $p->created_at ) : 0;
+				$calendar_days = ( 'new' === $outreach ) ? floor( ( current_time( 'timestamp' ) - strtotime( $p->created_at ) ) / DAY_IN_SECONDS ) : 0;
+			?>
 				<tr>
-					<td><?php echo esc_html( $p->name ); ?></td>
+					<td>
+						<?php echo esc_html( $p->name ); ?>
+						<?php if ( $is_new_batch && 'new' === $outreach ) : ?>
+							<span style="background:#2271b1; color:#fff; font-size:10px; padding:1px 6px; border-radius:10px; margin-left:4px;">NEW</span>
+						<?php endif; ?>
+					</td>
 					<td><?php echo esc_html( GRC_Industries::label( $p->industry ) ); ?></td>
 					<td><?php echo empty( $areas ) ? '<span style="color:#a00;">None set</span>' : esc_html( count( $areas ) . ' area' . ( count( $areas ) === 1 ? '' : 's' ) ); ?></td>
-					<td><?php echo esc_html( $p->phone ); ?></td>
-					<td>$<?php echo esc_html( number_format( (float) $p->payout_amount, 2 ) ); ?> (<?php echo esc_html( $p->payout_type ); ?>)</td>
-					<td>$<?php echo esc_html( number_format( (float) ( $p->customer_cashback_amount ?? 0 ), 2 ) ); ?></td>
+					<td>
+						$<?php echo esc_html( number_format( (float) $p->payout_amount, 2 ) ); ?> agent
+						<?php if ( (float) ( $p->customer_cashback_amount ?? 0 ) > 0 ) : ?>
+							/ $<?php echo esc_html( number_format( (float) $p->customer_cashback_amount, 2 ) ); ?> cash-back
+						<?php endif; ?>
+					</td>
+					<td>
+						<?php echo esc_html( $p->leads_sent ); ?>
+						<?php if ( $p->leads_sent >= 4 ) : ?>
+							<br><span style="color:#996800; font-size:11px;">&#9888; Discuss better terms</span>
+						<?php endif; ?>
+					</td>
 					<td><?php echo esc_html( ucfirst( $p->status ) ); ?></td>
+					<td>
+						<?php
+						$badge_colors = array( 'new' => '#646970', 'contacted' => '#2271b1', 'approved' => '#00a32a', 'rejected' => '#d63638' );
+						$color = $badge_colors[ $outreach ] ?? '#646970';
+						?>
+						<span style="color:<?php echo esc_attr( $color ); ?>; font-weight:600;"><?php echo esc_html( ucfirst( $outreach ) ); ?></span>
+						<?php if ( 'new' === $outreach && $calendar_days >= 7 ) : ?>
+							<br><span style="color:#d63638; font-weight:600; font-size:11px;">&#9873; Red-flagged (<?php echo esc_html( $calendar_days ); ?>d)</span>
+						<?php elseif ( 'new' === $outreach && $business_days >= 3 ) : ?>
+							<br><span style="color:#996800; font-weight:600; font-size:11px;">Overdue (<?php echo esc_html( $business_days ); ?> business days)</span>
+						<?php endif; ?>
+						<?php if ( 'approved' === $outreach && ! empty( $p->unusual_terms ) ) : ?>
+							<br><span style="font-size:11px; color:#646970;">Terms: <?php echo esc_html( $p->unusual_terms ); ?></span>
+						<?php endif; ?>
+						<?php if ( 'rejected' === $outreach && ! empty( $p->rejection_reason ) ) : ?>
+							<br><span style="font-size:11px; color:#646970;">Reason: <?php echo esc_html( $p->rejection_reason ); ?></span>
+						<?php endif; ?>
+					</td>
+					<td>
+						<?php if ( $p->source_url ) : ?>
+							<a href="<?php echo esc_url( $p->source_url ); ?>" target="_blank" rel="noopener noreferrer">Source &#8599;</a>
+						<?php else : ?>
+							&mdash;
+						<?php endif; ?>
+					</td>
+					<td>
+						<?php if ( in_array( $outreach, array( 'new', 'contacted' ), true ) ) : ?>
+							<?php if ( 'new' === $outreach ) : ?>
+								<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:6px;">
+									<?php wp_nonce_field( 'grc_mark_partner_contacted' ); ?>
+									<input type="hidden" name="action" value="grc_mark_partner_contacted">
+									<input type="hidden" name="partner_id" value="<?php echo esc_attr( $p->id ); ?>">
+									<button type="submit" class="button">Mark Contacted</button>
+								</form>
+							<?php endif; ?>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:6px; display:flex; gap:4px;">
+								<?php wp_nonce_field( 'grc_approve_partner' ); ?>
+								<input type="hidden" name="action" value="grc_approve_partner">
+								<input type="hidden" name="partner_id" value="<?php echo esc_attr( $p->id ); ?>">
+								<input type="text" name="unusual_terms" placeholder="Unusual terms (optional)" style="width:140px;">
+								<button type="submit" class="button button-primary">Approve</button>
+							</form>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex; gap:4px;" onsubmit="return confirm('Reject this partner?');">
+								<?php wp_nonce_field( 'grc_reject_partner' ); ?>
+								<input type="hidden" name="action" value="grc_reject_partner">
+								<input type="hidden" name="partner_id" value="<?php echo esc_attr( $p->id ); ?>">
+								<input type="text" name="rejection_reason" placeholder="Rejection reason" required style="width:140px;">
+								<button type="submit" class="button" style="color:#a00; border-color:#a00;">Reject</button>
+							</form>
+						<?php else : ?>
+							&mdash;
+						<?php endif; ?>
+					</td>
 					<td><a href="<?php echo esc_url( admin_url( 'admin.php?page=grc-partners&edit=' . $p->id ) ); ?>">Edit</a></td>
 				</tr>
 			<?php endforeach; ?>

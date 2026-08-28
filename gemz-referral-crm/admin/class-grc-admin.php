@@ -9,6 +9,9 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_reset_test_data', array( __CLASS__, 'handle_reset_database' ) );
 		add_action( 'admin_post_grc_update_lead_status', array( __CLASS__, 'handle_update_lead_status' ) );
 		add_action( 'admin_post_grc_delete_lead', array( __CLASS__, 'handle_delete_lead' ) );
+		add_action( 'admin_post_grc_mark_partner_contacted', array( __CLASS__, 'handle_mark_partner_contacted' ) );
+		add_action( 'admin_post_grc_approve_partner', array( __CLASS__, 'handle_approve_partner' ) );
+		add_action( 'admin_post_grc_reject_partner', array( __CLASS__, 'handle_reject_partner' ) );
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
 		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
 		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
@@ -204,6 +207,111 @@ class GRC_Admin {
 		}
 
 		return wp_json_encode( $clean );
+	}
+
+	/**
+	 * Marks a partner as contacted - the first real step of the outreach
+	 * pipeline, and what clears the "overdue"/"red-flagged" badges on
+	 * the Partners screen (both are computed from created_at vs today
+	 * for any partner still sitting in outreach_status='new').
+	 */
+	public static function handle_mark_partner_contacted() {
+		if ( ! current_user_can( 'grc_manage_partners' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_mark_partner_contacted' );
+
+		global $wpdb;
+		$partner_id = absint( $_POST['partner_id'] ?? 0 );
+		$wpdb->update( GRC_DB::table( 'partners' ), array(
+			'outreach_status' => 'contacted',
+			'contacted_at'    => current_time( 'mysql' ),
+			'updated_at'      => current_time( 'mysql' ),
+		), array( 'id' => $partner_id ) );
+
+		self::audit_log( 'partner', $partner_id, 'marked_contacted' );
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&outreach_updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Approves a partner and captures any non-standard terms (e.g. a
+	 * referral cap) so they're visible later without digging through
+	 * emails/call notes. Does NOT touch `status` (live/bookable) -
+	 * that's still a separate, deliberate admin action once the partner
+	 * actually has service areas configured and is ready to go live.
+	 */
+	public static function handle_approve_partner() {
+		if ( ! current_user_can( 'grc_manage_partners' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_approve_partner' );
+
+		global $wpdb;
+		$partner_id = absint( $_POST['partner_id'] ?? 0 );
+		$wpdb->update( GRC_DB::table( 'partners' ), array(
+			'outreach_status' => 'approved',
+			'unusual_terms'   => sanitize_textarea_field( $_POST['unusual_terms'] ?? '' ),
+			'updated_at'      => current_time( 'mysql' ),
+		), array( 'id' => $partner_id ) );
+
+		self::audit_log( 'partner', $partner_id, 'approved' );
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&outreach_updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Rejects a partner. A reason is required - the whole point of
+	 * capturing it is so a rejection can be reviewed later without
+	 * anyone having to remember why.
+	 */
+	public static function handle_reject_partner() {
+		if ( ! current_user_can( 'grc_manage_partners' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_reject_partner' );
+
+		$reason = sanitize_textarea_field( $_POST['rejection_reason'] ?? '' );
+		if ( empty( $reason ) ) {
+			wp_die( 'A rejection reason is required.' );
+		}
+
+		global $wpdb;
+		$partner_id = absint( $_POST['partner_id'] ?? 0 );
+		$wpdb->update( GRC_DB::table( 'partners' ), array(
+			'outreach_status'  => 'rejected',
+			'rejection_reason' => $reason,
+			'updated_at'       => current_time( 'mysql' ),
+		), array( 'id' => $partner_id ) );
+
+		self::audit_log( 'partner', $partner_id, 'rejected', array( 'reason' => $reason ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&outreach_updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Business (Mon-Fri) days elapsed between a MySQL datetime and now -
+	 * used to compute the "overdue" badge (>=3) on uncontacted partners.
+	 * No holiday calendar - not specified, and not worth the complexity
+	 * for a soft internal reminder badge.
+	 */
+	public static function business_days_since( $mysql_datetime ) {
+		$start = new DateTime( $mysql_datetime, wp_timezone() );
+		$now   = new DateTime( current_time( 'mysql' ), wp_timezone() );
+		if ( $now <= $start ) {
+			return 0;
+		}
+
+		$count = 0;
+		$cursor = clone $start;
+		while ( $cursor < $now ) {
+			$cursor->modify( '+1 day' );
+			$weekday = (int) $cursor->format( 'N' ); // 1 (Mon) - 7 (Sun)
+			if ( $weekday < 6 ) {
+				$count++;
+			}
+		}
+		return $count;
 	}
 
 	/**

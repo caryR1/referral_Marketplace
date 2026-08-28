@@ -22,7 +22,7 @@ class GRC_Deactivator {
 	 */
 	public static function drop_all_tables() {
 		global $wpdb;
-		$tables = array( 'partners', 'agents', 'campaigns', 'leads', 'milestones', 'commissions', 'customer_payouts', 'notifications_log', 'audit_log', 'email_templates' );
+		$tables = array( 'partners', 'agents', 'agent_segments', 'campaigns', 'leads', 'milestones', 'commissions', 'customer_payouts', 'notifications_log', 'audit_log', 'email_templates' );
 		foreach ( $tables as $t ) {
 			$full = GRC_DB::table( $t );
 			$wpdb->query( "DROP TABLE IF EXISTS {$full}" ); // phpcs:ignore -- table name is from our own fixed whitelist above, not user input
