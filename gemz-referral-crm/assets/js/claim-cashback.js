@@ -44,10 +44,15 @@
 				.then( function ( res ) { return res.json(); } )
 				.then( function ( data ) {
 					if ( data && data.success ) {
-						form.style.display = 'none';
+						// msg lives inside the form, so hiding the whole form would hide
+						// the success text with it - hide only the fields/button instead.
+						Array.prototype.forEach.call( form.children, function ( child ) {
+							if ( child !== msg ) {
+								child.style.display = 'none';
+							}
+						} );
 						msg.textContent = 'Thanks! We\'ve got your payout details and we\'re processing your cash back now.';
 						msg.classList.add( 'grc-success' );
-						msg.style.display = 'block';
 					} else {
 						btn.disabled = false;
 						btn.textContent = 'Claim My Cash Back';

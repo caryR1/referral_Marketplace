@@ -11,6 +11,28 @@ class GRC_Claim_Cashback {
 
 	public static function init() {
 		add_shortcode( 'gemz_claim_cashback', array( __CLASS__, 'render' ) );
+		add_action( 'template_redirect', array( __CLASS__, 'maybe_disable_cache' ) );
+	}
+
+	/**
+	 * This page's content is entirely driven by the ?token= query string
+	 * and changes as soon as the visitor submits the form (ready -> claimed
+	 * -> paid) - a full-page cache plugin (e.g. LiteSpeed Cache) has no way
+	 * to know that, so without this it will happily serve a stale cached
+	 * copy (wrong amount, stale status, or - worse - one visitor's cached
+	 * page bleeding into another) to every token that hits this URL.
+	 */
+	public static function maybe_disable_cache() {
+		if ( ! is_singular() ) {
+			return;
+		}
+		$content = get_post()->post_content ?? '';
+		if ( ! has_shortcode( $content, 'gemz_claim_cashback' ) ) {
+			return;
+		}
+
+		nocache_headers();
+		do_action( 'litespeed_control_set_nocache', 'gemz cash-back claim page is token-specific and must never be cached' );
 	}
 
 	public static function render( $atts ) {

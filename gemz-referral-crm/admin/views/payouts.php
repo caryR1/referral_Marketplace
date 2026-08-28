@@ -37,11 +37,11 @@ $commissions = $wpdb->get_results( "
 	<p class="description">A homeowner's reward is created automatically when their lead is marked completed (if the partner has a Customer Cash-Back Amount set). "Ready" means we're waiting on them to submit a payout method via their claim link; only "Claimed" rows can be marked paid.</p>
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
-			<tr><th>Customer</th><th>Amount</th><th>Status</th><th>Payout Method</th><th>Updated</th><th>Action</th></tr>
+			<tr><th>Customer</th><th>Amount</th><th>Status</th><th>Payout Method</th><th>Claim Link</th><th>Updated</th><th>Action</th></tr>
 		</thead>
 		<tbody>
 			<?php if ( empty( $customer_payouts ) ) : ?>
-				<tr><td colspan="6">No homeowner cash-back rewards yet.</td></tr>
+				<tr><td colspan="7">No homeowner cash-back rewards yet.</td></tr>
 			<?php endif; ?>
 			<?php foreach ( $customer_payouts as $cp ) : ?>
 				<tr>
@@ -49,6 +49,14 @@ $commissions = $wpdb->get_results( "
 					<td>$<?php echo esc_html( number_format( (float) $cp->amount, 2 ) ); ?></td>
 					<td><?php echo esc_html( ucfirst( $cp->status ) ); ?></td>
 					<td><?php echo esc_html( $cp->payout_method ? ucfirst( $cp->payout_method ) : '—' ); ?></td>
+					<td>
+						<?php if ( 'ready' === $cp->status ) : ?>
+							<?php $claim_url = add_query_arg( 'token', $cp->claim_token, home_url( '/claim-cashback/' ) ); ?>
+							<input type="text" readonly value="<?php echo esc_url( $claim_url ); ?>" style="width:100%; font-size:11px;" onclick="this.select();">
+						<?php else : ?>
+							&mdash;
+						<?php endif; ?>
+					</td>
 					<td><?php echo esc_html( $cp->updated_at ); ?></td>
 					<td>
 						<?php if ( 'claimed' === $cp->status ) : ?>

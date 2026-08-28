@@ -23,16 +23,19 @@ $statuses = array( 'new', 'sent_to_partner', 'accepted', 'in_progress', 'complet
 	<?php if ( ! empty( $_GET['updated'] ) ) : ?>
 		<div class="notice notice-success"><p>Lead status updated.</p></div>
 	<?php endif; ?>
+	<?php if ( ! empty( $_GET['deleted'] ) ) : ?>
+		<div class="notice notice-success"><p>Lead deleted.</p></div>
+	<?php endif; ?>
 
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
-				<th>Customer</th><th>Partner</th><th>Agent</th><th>Status</th><th>Appointment</th><th>Created</th>
+				<th>Customer</th><th>Partner</th><th>Agent</th><th>Status</th><th>Appointment</th><th>Created</th><th>Actions</th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php if ( empty( $leads ) ) : ?>
-				<tr><td colspan="6">No leads yet. Leads will appear here as they come in through campaign landing pages.</td></tr>
+				<tr><td colspan="7">No leads yet. Leads will appear here as they come in through campaign landing pages.</td></tr>
 			<?php endif; ?>
 			<?php foreach ( $leads as $l ) : ?>
 				<tr>
@@ -54,6 +57,14 @@ $statuses = array( 'new', 'sent_to_partner', 'accepted', 'in_progress', 'complet
 					</td>
 					<td><?php echo esc_html( $l->appointment_primary ?: '—' ); ?></td>
 					<td><?php echo esc_html( $l->created_at ); ?></td>
+					<td>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete this lead permanently? This also removes any related commission and cash-back rows. This cannot be undone.');">
+							<?php wp_nonce_field( 'grc_delete_lead' ); ?>
+							<input type="hidden" name="action" value="grc_delete_lead">
+							<input type="hidden" name="lead_id" value="<?php echo esc_attr( $l->id ); ?>">
+							<button type="submit" class="button-link" style="color:#a00;">Delete</button>
+						</form>
+					</td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>

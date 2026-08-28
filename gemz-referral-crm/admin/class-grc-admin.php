@@ -8,6 +8,7 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_save_partner', array( __CLASS__, 'handle_save_partner' ) );
 		add_action( 'admin_post_grc_reset_test_data', array( __CLASS__, 'handle_reset_database' ) );
 		add_action( 'admin_post_grc_update_lead_status', array( __CLASS__, 'handle_update_lead_status' ) );
+		add_action( 'admin_post_grc_delete_lead', array( __CLASS__, 'handle_delete_lead' ) );
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
 		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
 		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
@@ -348,6 +349,38 @@ class GRC_Admin {
 		}
 
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-leads&updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Deletes a lead outright, cascading to its commission and customer
+	 * cash-back rows (money tied to a lead that no longer exists is
+	 * meaningless). Notification/audit log rows are left alone - they're
+	 * a historical record, not live state, and stay valid even
+	 * referencing a deleted lead_id. Meant for genuinely bad/test/spam
+	 * leads; a normal closed-out lead should get marked 'lost', not
+	 * deleted, so its audit trail and history stay intact.
+	 */
+	public static function handle_delete_lead() {
+		if ( ! current_user_can( 'grc_manage_leads' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_delete_lead' );
+
+		global $wpdb;
+		$lead_id = absint( $_POST['lead_id'] ?? 0 );
+		if ( ! $lead_id ) {
+			wp_die( 'Invalid request.' );
+		}
+
+		$wpdb->delete( GRC_DB::table( 'commissions' ), array( 'lead_id' => $lead_id ) );
+		$wpdb->delete( GRC_DB::table( 'customer_payouts' ), array( 'lead_id' => $lead_id ) );
+		$wpdb->delete( GRC_DB::table( 'milestones' ), array( 'lead_id' => $lead_id ) );
+		$wpdb->delete( GRC_DB::table( 'leads' ), array( 'id' => $lead_id ) );
+
+		self::audit_log( 'lead', $lead_id, 'deleted' );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-leads&deleted=1' ) );
 		exit;
 	}
 
