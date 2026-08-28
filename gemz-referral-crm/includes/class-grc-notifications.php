@@ -177,6 +177,43 @@ class GRC_Notifications {
 		return $code >= 200 && $code < 300;
 	}
 
+	/**
+	 * Routes wp_mail() through real SMTP credentials instead of PHP's
+	 * default mail(), which on shared hosting is frequently spam-filtered
+	 * or silently dropped (no SPF/DKIM, shared IP reputation) - this is
+	 * why a customer can be logged as "sent" and never actually receive
+	 * anything. Stays a no-op unless Settings -> Email has "Use SMTP"
+	 * checked with a host, username, and password all saved, same
+	 * "inert until configured" pattern as the Twilio WhatsApp integration.
+	 */
+	public static function maybe_configure_smtp( $phpmailer ) {
+		if ( '1' !== get_option( 'grc_smtp_enabled', '' ) ) {
+			return;
+		}
+
+		$host     = get_option( 'grc_smtp_host', '' );
+		$username = get_option( 'grc_smtp_username', '' );
+		$password = get_option( 'grc_smtp_password', '' );
+
+		if ( empty( $host ) || empty( $username ) || empty( $password ) ) {
+			return;
+		}
+
+		$encryption = get_option( 'grc_smtp_encryption', 'tls' );
+
+		$phpmailer->isSMTP();
+		$phpmailer->Host       = $host;
+		$phpmailer->Port       = get_option( 'grc_smtp_port', 587 );
+		$phpmailer->SMTPAuth   = true;
+		$phpmailer->Username   = $username;
+		$phpmailer->Password   = $password;
+		$phpmailer->SMTPSecure = ( 'none' === $encryption ) ? '' : $encryption;
+
+		$from_email = get_option( 'grc_smtp_from_email', '' ) ?: $username;
+		$from_name  = get_option( 'grc_smtp_from_name', '' ) ?: get_bloginfo( 'name' );
+		$phpmailer->setFrom( $from_email, $from_name );
+	}
+
 	private static function log( $event_key, $recipient_type, $recipient_ref, $channel, $related_lead_id, $status ) {
 		global $wpdb;
 		$wpdb->insert(
@@ -195,3 +232,4 @@ class GRC_Notifications {
 }
 
 add_filter( 'grc_send_whatsapp', array( 'GRC_Notifications', 'maybe_send_whatsapp_via_twilio' ), 10, 5 );
+add_action( 'phpmailer_init', array( 'GRC_Notifications', 'maybe_configure_smtp' ) );

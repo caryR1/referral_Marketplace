@@ -12,8 +12,46 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
 		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
 		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
+		add_action( 'admin_post_grc_save_smtp_settings', array( __CLASS__, 'handle_save_smtp_settings' ) );
 		add_action( 'admin_post_grc_mark_customer_payout_paid', array( __CLASS__, 'handle_mark_customer_payout_paid' ) );
 		add_action( 'admin_post_grc_mark_commission_paid', array( __CLASS__, 'handle_mark_commission_paid' ) );
+		add_action( 'grc_daily_stale_lead_check', array( __CLASS__, 'check_stale_leads' ) );
+	}
+
+	/**
+	 * Flags leads that have sat in an active (non-terminal) status for
+	 * too long without any partner update, and pings the site admin so a
+	 * follow-up call actually happens instead of a lead silently rotting.
+	 * Runs daily via wp_schedule_event (see gemz-referral-crm.php's
+	 * plugins_loaded safety net, same "works after a zip redeploy without
+	 * a manual reactivate" reasoning as the DB-version check).
+	 */
+	public static function check_stale_leads() {
+		global $wpdb;
+		$leads_table = GRC_DB::table( 'leads' );
+		$partners_table = GRC_DB::table( 'partners' );
+
+		$stale_days = (int) apply_filters( 'grc_stale_lead_days', 5 );
+		$cutoff = gmdate( 'Y-m-d H:i:s', strtotime( "-{$stale_days} days", current_time( 'timestamp' ) ) );
+
+		$stale_leads = $wpdb->get_results( $wpdb->prepare( "
+			SELECT l.*, p.name AS partner_name
+			FROM {$leads_table} l
+			LEFT JOIN {$partners_table} p ON p.id = l.partner_id
+			WHERE l.status IN ('new','sent_to_partner','accepted','in_progress')
+			AND COALESCE(l.last_partner_update_at, l.created_at) < %s
+		", $cutoff ) );
+
+		foreach ( $stale_leads as $lead ) {
+			$wpdb->update( $leads_table, array( 'status' => 'stale', 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $lead->id ) );
+
+			GRC_Notifications::send( 'lead_stale', 'admin', get_option( 'admin_email' ), 'email', array(
+				'customer_name' => $lead->customer_name,
+				'partner_name'  => $lead->partner_name ?: 'Unknown partner',
+			), $lead->id );
+
+			self::audit_log( 'lead', $lead->id, 'marked_stale', array( 'days_inactive' => $stale_days ) );
+		}
 	}
 
 	public static function register_menu() {
@@ -291,6 +329,43 @@ class GRC_Admin {
 	}
 
 	/**
+	 * Saves SMTP settings (Referral CRM -> Settings -> Email). Same
+	 * "blank password means keep existing" convention as the Twilio auth
+	 * token field. Once "Use SMTP" is checked and host/username/password
+	 * are all present, GRC_Notifications::maybe_configure_smtp() (hooked
+	 * to phpmailer_init) routes every plugin email through it instead of
+	 * PHP's default mail() - this is what actually fixes deliverability,
+	 * since unauthenticated mail() sends are what get spam-filtered.
+	 */
+	public static function handle_save_smtp_settings() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_save_smtp_settings' );
+
+		update_option( 'grc_smtp_enabled', ! empty( $_POST['smtp_enabled'] ) ? '1' : '' );
+		update_option( 'grc_smtp_host', sanitize_text_field( $_POST['smtp_host'] ?? '' ) );
+		update_option( 'grc_smtp_port', absint( $_POST['smtp_port'] ?? 587 ) );
+		update_option( 'grc_smtp_encryption', sanitize_text_field( $_POST['smtp_encryption'] ?? 'tls' ) );
+		update_option( 'grc_smtp_username', sanitize_text_field( $_POST['smtp_username'] ?? '' ) );
+
+		if ( ! empty( $_POST['smtp_password'] ) ) {
+			update_option( 'grc_smtp_password', sanitize_text_field( wp_unslash( $_POST['smtp_password'] ) ) );
+		}
+
+		update_option( 'grc_smtp_from_email', sanitize_email( $_POST['smtp_from_email'] ?? '' ) );
+		update_option( 'grc_smtp_from_name', sanitize_text_field( $_POST['smtp_from_name'] ?? '' ) );
+
+		self::audit_log( 'settings', 0, 'smtp_settings_updated', array(
+			'enabled' => ! empty( $_POST['smtp_enabled'] ),
+			'host'    => sanitize_text_field( $_POST['smtp_host'] ?? '' ),
+		) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-settings&smtp_saved=1' ) );
+		exit;
+	}
+
+	/**
 	 * Explicit, confirmed reset of all plugin tables. Only for dev/testing.
 	 * Requires a checked confirmation checkbox in the settings screen form,
 	 * on top of the capability check and nonce - three separate guards
@@ -348,8 +423,43 @@ class GRC_Admin {
 			do_action( 'grc_lead_marked_completed', $lead_id );
 		}
 
+		if ( 'accepted' === $new_status ) {
+			self::maybe_notify_agent_lead_accepted( $lead_id );
+		}
+
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-leads&updated=1' ) );
 		exit;
+	}
+
+	/**
+	 * Lets the agent who referred a lead know the partner is actually
+	 * moving on it, rather than leaving them wondering if their referral
+	 * went nowhere. No-op for organic/direct leads (no agent credited).
+	 */
+	private static function maybe_notify_agent_lead_accepted( $lead_id ) {
+		global $wpdb;
+		$leads_table  = GRC_DB::table( 'leads' );
+		$agents_table = GRC_DB::table( 'agents' );
+
+		$lead = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$leads_table} WHERE id = %d", $lead_id ) );
+		if ( ! $lead || empty( $lead->agent_id ) ) {
+			return;
+		}
+
+		$agent = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$agents_table} WHERE id = %d", $lead->agent_id ) );
+		if ( ! $agent ) {
+			return;
+		}
+
+		$agent_user = get_userdata( $agent->user_id );
+		if ( ! $agent_user ) {
+			return;
+		}
+
+		GRC_Notifications::send( 'lead_accepted_by_partner', 'agent', $agent_user->user_email, 'email', array(
+			'agent_name'    => $agent_user->display_name,
+			'customer_name' => $lead->customer_name,
+		), $lead_id );
 	}
 
 	/**

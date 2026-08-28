@@ -92,6 +92,17 @@ class GRC_Commissions {
 			$tier++;
 		}
 
+		$direct_agent = $chain[1] ?? null;
+		if ( $direct_agent ) {
+			$direct_agent_user = get_userdata( $direct_agent->user_id );
+			if ( $direct_agent_user ) {
+				GRC_Notifications::send( 'project_completed', 'agent', $direct_agent_user->user_email, 'email', array(
+					'agent_name'    => $direct_agent_user->display_name,
+					'customer_name' => $lead->customer_name,
+				), $lead_id );
+			}
+		}
+
 		$split = self::get_split();
 		$now   = current_time( 'mysql' );
 		foreach ( $chain as $tier_num => $agent ) {

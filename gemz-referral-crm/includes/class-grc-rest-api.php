@@ -322,6 +322,16 @@ class GRC_REST_API {
 			}
 		}
 
+		$partners_table = GRC_DB::table( 'partners' );
+		$partner = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$partners_table} WHERE id = %d", absint( $params['partner_id'] ) ) );
+		if ( $partner && ! empty( $partner->email ) ) {
+			GRC_Notifications::send( 'new_lead_for_partner', 'partner', $partner->email, 'email', array(
+				'customer_name'      => sanitize_text_field( $params['customer_name'] ),
+				'preferred_contact'  => sanitize_text_field( $params['preferred_contact'] ?? 'phone' ),
+				'appointment_date'   => ! empty( $params['appointment_primary'] ) ? sanitize_text_field( $params['appointment_primary'] ) : 'not set',
+			), $lead_id );
+		}
+
 		return rest_ensure_response( array( 'success' => true, 'lead_id' => $lead_id ) );
 	}
 }

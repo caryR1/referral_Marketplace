@@ -10,6 +10,15 @@ $whatsapp_provider = get_option( 'grc_whatsapp_provider', 'none' );
 $twilio_sid        = get_option( 'grc_whatsapp_twilio_sid', '' );
 $twilio_from       = get_option( 'grc_whatsapp_twilio_from', '' );
 $has_twilio_token  = (bool) get_option( 'grc_whatsapp_twilio_auth_token', '' );
+
+$smtp_enabled     = get_option( 'grc_smtp_enabled', '' );
+$smtp_host        = get_option( 'grc_smtp_host', '' );
+$smtp_port        = get_option( 'grc_smtp_port', '587' );
+$smtp_encryption  = get_option( 'grc_smtp_encryption', 'tls' );
+$smtp_username    = get_option( 'grc_smtp_username', '' );
+$has_smtp_password = (bool) get_option( 'grc_smtp_password', '' );
+$smtp_from_email  = get_option( 'grc_smtp_from_email', '' );
+$smtp_from_name   = get_option( 'grc_smtp_from_name', 'Gemz' );
 ?>
 <div class="wrap">
 	<h1>Settings</h1>
@@ -22,6 +31,9 @@ $has_twilio_token  = (bool) get_option( 'grc_whatsapp_twilio_auth_token', '' );
 	<?php endif; ?>
 	<?php if ( ! empty( $_GET['whatsapp_saved'] ) ) : ?>
 		<div class="notice notice-success"><p>WhatsApp settings saved.</p></div>
+	<?php endif; ?>
+	<?php if ( ! empty( $_GET['smtp_saved'] ) ) : ?>
+		<div class="notice notice-success"><p>Email (SMTP) settings saved.</p></div>
 	<?php endif; ?>
 
 	<h2>Plugin Info</h2>
@@ -50,6 +62,62 @@ $has_twilio_token  = (bool) get_option( 'grc_whatsapp_twilio_auth_token', '' );
 		</table>
 		<?php submit_button( 'Save Commission Split' ); ?>
 	</form>
+
+	<hr>
+
+	<h2>Email (SMTP)</h2>
+	<p class="description">
+		By default, all plugin emails go through PHP's built-in <code>mail()</code>, which on shared hosting is frequently spam-filtered or silently dropped by the receiving mail server (no SPF/DKIM, shared IP reputation). Configuring real SMTP credentials here routes every email through an authenticated mail account instead - this is the fix if customers report never getting their booking confirmation or cash-back claim email.
+		Use a mailbox created in your hosting panel (e.g. <code>noreply@refer.gemzonline.com</code>), or credentials from a transactional email provider (SendGrid, Postmark, etc.) if you switch to one later.
+	</p>
+	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<?php wp_nonce_field( 'grc_save_smtp_settings' ); ?>
+		<input type="hidden" name="action" value="grc_save_smtp_settings">
+		<table class="form-table">
+			<tr>
+				<th><label for="smtp_enabled">Use SMTP</label></th>
+				<td>
+					<label><input type="checkbox" id="smtp_enabled" name="smtp_enabled" value="1" <?php checked( $smtp_enabled, '1' ); ?>> Route plugin emails through the SMTP settings below instead of PHP's default mail()</label>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="smtp_host">SMTP Host</label></th>
+				<td><input type="text" id="smtp_host" name="smtp_host" class="regular-text" value="<?php echo esc_attr( $smtp_host ); ?>" placeholder="smtp.hostinger.com"></td>
+			</tr>
+			<tr>
+				<th><label for="smtp_port">SMTP Port</label></th>
+				<td><input type="number" id="smtp_port" name="smtp_port" value="<?php echo esc_attr( $smtp_port ); ?>" placeholder="587"></td>
+			</tr>
+			<tr>
+				<th><label for="smtp_encryption">Encryption</label></th>
+				<td>
+					<select id="smtp_encryption" name="smtp_encryption">
+						<option value="tls" <?php selected( $smtp_encryption, 'tls' ); ?>>TLS (usually port 587)</option>
+						<option value="ssl" <?php selected( $smtp_encryption, 'ssl' ); ?>>SSL (usually port 465)</option>
+						<option value="none" <?php selected( $smtp_encryption, 'none' ); ?>>None</option>
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="smtp_username">SMTP Username</label></th>
+				<td><input type="text" id="smtp_username" name="smtp_username" class="regular-text" value="<?php echo esc_attr( $smtp_username ); ?>" placeholder="noreply@refer.gemzonline.com"></td>
+			</tr>
+			<tr>
+				<th><label for="smtp_password">SMTP Password</label></th>
+				<td><input type="password" id="smtp_password" name="smtp_password" class="regular-text" placeholder="<?php echo $has_smtp_password ? esc_attr( '•••••••• (saved — leave blank to keep)' ) : ''; ?>"></td>
+			</tr>
+			<tr>
+				<th><label for="smtp_from_email">From Email</label></th>
+				<td><input type="email" id="smtp_from_email" name="smtp_from_email" class="regular-text" value="<?php echo esc_attr( $smtp_from_email ); ?>" placeholder="Usually the same as SMTP Username"></td>
+			</tr>
+			<tr>
+				<th><label for="smtp_from_name">From Name</label></th>
+				<td><input type="text" id="smtp_from_name" name="smtp_from_name" value="<?php echo esc_attr( $smtp_from_name ); ?>"></td>
+			</tr>
+		</table>
+		<?php submit_button( 'Save Email Settings' ); ?>
+	</form>
+	<p class="description">After saving, send yourself a test from <a href="<?php echo esc_url( admin_url( 'admin.php?page=grc-email-templates' ) ); ?>">Email Templates</a> to confirm delivery actually works.</p>
 
 	<hr>
 
