@@ -37,8 +37,19 @@
 					} else {
 						btn.disabled = false;
 						btn.textContent = 'Become an Agent';
-						msg.textContent = ( data && data.message ) ? data.message : 'Something went wrong - please try again.';
 						msg.classList.add( 'grc-error' );
+
+						if ( data && data.code === 'grc_email_taken' ) {
+							var loginUrl = gemzAgentSignup.loginUrl || '/agent-login/';
+							msg.textContent = '';
+							msg.appendChild( document.createTextNode( 'An account with that email already exists. ' ) );
+							var link = document.createElement( 'a' );
+							link.href = loginUrl;
+							link.textContent = 'Try logging in instead.';
+							msg.appendChild( link );
+						} else {
+							msg.textContent = ( data && data.message ) ? data.message : 'Something went wrong - please try again.';
+						}
 					}
 				} )
 				.catch( function () {

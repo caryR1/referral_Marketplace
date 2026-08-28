@@ -48,6 +48,45 @@ class GRC_REST_API {
 			'callback'            => array( __CLASS__, 'register_agent' ),
 			'permission_callback' => '__return_true', // public: this is how a visitor becomes an agent
 		) );
+
+		register_rest_route( self::NAMESPACE_, '/agents/login', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'login_agent' ),
+			'permission_callback' => '__return_true', // public: this is the front-end login form
+		) );
+	}
+
+	/**
+	 * Front-end agent login. Deliberately returns the SAME generic error
+	 * for "no account with that email" and "wrong password" - never let
+	 * the UI tell a visitor whether a given email is registered.
+	 */
+	public static function login_agent( WP_REST_Request $request ) {
+		$params   = $request->get_json_params();
+		$email    = sanitize_email( $params['email'] ?? '' );
+		$password = (string) ( $params['password'] ?? '' );
+
+		$generic_error = new WP_Error( 'grc_login_failed', 'Invalid email or password.', array( 'status' => 401 ) );
+
+		if ( empty( $email ) || empty( $password ) ) {
+			return $generic_error;
+		}
+
+		$user = wp_signon( array(
+			'user_login'    => $email,
+			'user_password' => $password,
+			'remember'      => true,
+		), is_ssl() );
+
+		if ( is_wp_error( $user ) ) {
+			return $generic_error;
+		}
+
+		wp_set_current_user( $user->ID );
+
+		$redirect = home_url( '/agent-portal/' );
+
+		return rest_ensure_response( array( 'success' => true, 'redirect' => $redirect ) );
 	}
 
 	/**

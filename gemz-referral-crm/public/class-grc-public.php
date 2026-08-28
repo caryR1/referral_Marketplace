@@ -67,19 +67,26 @@ class GRC_Public {
 	}
 
 	public static function enqueue_assets() {
+		// Site-wide: fonts + the frontend theme (header/footer/hero/card system)
+		// load on every page, not just ones with a shortcode, since the header
+		// and footer appear everywhere.
+		wp_enqueue_style( 'grc-brand-fonts', 'https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap', array(), null );
+		wp_enqueue_style( 'grc-frontend-theme', GRC_PLUGIN_URL . 'assets/css/gemz-frontend-theme.css', array(), GRC_VERSION );
+
 		$content = is_singular() ? ( get_post()->post_content ?? '' ) : '';
 		$has_form    = has_shortcode( $content, 'gemz_appointment_form' );
 		$has_browser = has_shortcode( $content, 'gemz_industry_browser' );
 		$has_portal  = has_shortcode( $content, 'gemz_agent_dashboard' );
 		$has_signup  = has_shortcode( $content, 'gemz_agent_signup' );
+		$has_login   = has_shortcode( $content, 'gemz_agent_login' );
 
-		if ( ! $has_form && ! $has_browser && ! $has_portal && ! $has_signup ) {
+		if ( ! $has_form && ! $has_browser && ! $has_portal && ! $has_signup && ! $has_login ) {
 			return;
 		}
 
-		// Shared brand tokens + Google Fonts (Sora for display, Inter for body) -
-		// loaded once, used by all front-end components for visual consistency.
-		wp_enqueue_style( 'grc-brand-fonts', 'https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap', array(), null );
+		// Legacy brand tokens - kept for the older inline-styled pages (Home,
+		// Roofing, Solar, Windows & Doors, Tiny & Modular Homes) built before
+		// the gemz-frontend-theme.css system; harmless to load alongside it.
 		wp_enqueue_style( 'grc-brand-tokens', GRC_PLUGIN_URL . 'assets/css/gemz-brand.css', array(), GRC_VERSION );
 
 		if ( $has_form ) {
@@ -108,7 +115,17 @@ class GRC_Public {
 			wp_enqueue_script( 'grc-agent-signup', GRC_PLUGIN_URL . 'assets/js/agent-signup.js', array(), GRC_VERSION, true );
 			wp_enqueue_style( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/css/agent-portal.css', array( 'grc-brand-tokens' ), GRC_VERSION );
 			wp_localize_script( 'grc-agent-signup', 'gemzAgentSignup', array(
-				'restUrl' => esc_url_raw( rest_url( 'gemz-crm/v1/agents/register' ) ),
+				'restUrl'  => esc_url_raw( rest_url( 'gemz-crm/v1/agents/register' ) ),
+				'loginUrl' => esc_url_raw( home_url( '/agent-login/' ) ),
+			) );
+		}
+
+		if ( $has_login ) {
+			wp_enqueue_script( 'grc-agent-login', GRC_PLUGIN_URL . 'assets/js/agent-login.js', array(), GRC_VERSION, true );
+			wp_enqueue_style( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/css/agent-portal.css', array( 'grc-brand-tokens' ), GRC_VERSION );
+			wp_localize_script( 'grc-agent-login', 'gemzAgentLogin', array(
+				'restUrl'      => esc_url_raw( rest_url( 'gemz-crm/v1/agents/login' ) ),
+				'dashboardUrl' => esc_url_raw( home_url( '/agent-portal/' ) ),
 			) );
 		}
 	}

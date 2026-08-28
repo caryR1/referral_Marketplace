@@ -30,12 +30,12 @@ class GRC_Agent_Portal {
 
 	public static function render_dashboard( $atts ) {
 		if ( ! is_user_logged_in() ) {
-			return '<p class="gemz-portal-notice">Please log in to view your agent dashboard.</p>';
+			return '<p class="gemz-portal-notice">Please <a href="' . esc_url( home_url( '/agent-login/' ) ) . '">log in</a> to view your agent dashboard. New here? <a href="' . esc_url( home_url( '/become-an-agent/' ) ) . '">Create a free agent account</a>.</p>';
 		}
 
 		$agent = self::get_current_agent();
 		if ( ! $agent ) {
-			return '<p class="gemz-portal-notice">No agent profile is linked to your account yet. Contact the site admin.</p>';
+			return '<p class="gemz-portal-notice">No agent profile is linked to your account yet. <a href="' . esc_url( home_url( '/become-an-agent/' ) ) . '">Become an agent</a> or contact the site admin.</p>';
 		}
 
 		global $wpdb;

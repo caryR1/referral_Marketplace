@@ -72,14 +72,34 @@
 	color: var(--gemz-navy);
 }
 
+/* Steps 2 & 3 need their own explicit light card too - this widget is now
+   frequently embedded inside a dark glassmorphic hero card (see
+   .gemz-hero-widget-card in gemz-frontend-theme.css), so a step that just
+   inherits "whatever's behind it" can end up rendering dark navy heading
+   text on a near-black background, unreadable. Giving every step its own
+   opaque white surface keeps steps 2/3 reliably light regardless of what
+   they're embedded in. */
+.gemz-browser-step[data-step="location"],
+.gemz-browser-step[data-step="offers"] {
+	background: var(--gemz-white);
+	border-radius: 28px;
+	padding: 32px 28px;
+	box-shadow: var(--shadow-floating, var(--gemz-shadow-lg));
+}
+
+.gemz-browser-step[data-step="location"] h2,
+.gemz-browser-step[data-step="offers"] h2 {
+	color: var(--gemz-navy);
+}
+
 /* Step 2: location entry */
 .gemz-location-form {
 	margin-top: 20px;
-	background: var(--gemz-white);
+	background: var(--gemz-bg);
 	border: 1px solid var(--gemz-line);
 	border-radius: var(--gemz-radius);
 	padding: 24px;
-	box-shadow: var(--gemz-shadow);
+	box-shadow: none;
 }
 
 .gemz-location-form label {
