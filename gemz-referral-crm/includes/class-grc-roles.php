@@ -47,6 +47,31 @@ class GRC_Roles {
 	}
 
 	/**
+	 * Where should "your dashboard" actually point for whoever's looking
+	 * at the page right now? Used by the nav menu item, and by the
+	 * agent login/signup pages' "you're already logged in" messages -
+	 * both were previously dead ends (plain text, no link at all).
+	 */
+	public static function get_portal_link_for_current_user() {
+		if ( ! is_user_logged_in() ) {
+			return array( 'label' => 'Agent Login', 'url' => home_url( '/agent-login/' ) );
+		}
+
+		$roles = (array) wp_get_current_user()->roles;
+
+		if ( in_array( self::AGENT_ROLE, $roles, true ) ) {
+			return array( 'label' => 'Agent Portal', 'url' => home_url( '/agent-portal/' ) );
+		}
+		if ( in_array( self::PARTNER_ROLE, $roles, true ) ) {
+			return array( 'label' => 'Partner Portal', 'url' => home_url( '/partner-portal/' ) );
+		}
+
+		// Logged in (e.g. as an admin) but neither role - nothing to send
+		// them to, so don't imply a dashboard that doesn't exist for them.
+		return array( 'label' => null, 'url' => null );
+	}
+
+	/**
 	 * Auto-creates (or links) a WP user account for a partner so they can
 	 * log in to their own dashboard - called whenever a partner is saved
 	 * with an email and doesn't have one yet. If that email already

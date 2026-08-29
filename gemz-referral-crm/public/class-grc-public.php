@@ -24,6 +24,37 @@ class GRC_Public {
 		add_shortcode( 'gemz_appointment_form', array( __CLASS__, 'render_appointment_form' ) );
 		add_shortcode( 'gemz_industry_browser', array( __CLASS__, 'render_industry_browser' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
+		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'swap_agent_login_nav_item' ) );
+	}
+
+	/**
+	 * The main nav has one "Agent Login" item pointing at /agent-login/.
+	 * That page itself already handles "you're logged in, go to your X"
+	 * (see GRC_Roles::get_portal_link_for_current_user()), but before
+	 * this fix there was no way to reach a portal from the nav at all
+	 * once logged in - you'd click "Agent Login" and land on a page
+	 * telling you to go somewhere else. Rewrite that one item in place
+	 * (by matching its URL, not by ID, so this doesn't break if the menu
+	 * item is ever recreated) so the nav itself takes you straight there.
+	 */
+	public static function swap_agent_login_nav_item( $items ) {
+		if ( ! is_user_logged_in() ) {
+			return $items;
+		}
+
+		$portal = GRC_Roles::get_portal_link_for_current_user();
+		if ( ! $portal['url'] ) {
+			return $items;
+		}
+
+		foreach ( $items as $item ) {
+			if ( false !== strpos( $item->url, '/agent-login/' ) ) {
+				$item->url   = $portal['url'];
+				$item->title = $portal['label'];
+			}
+		}
+
+		return $items;
 	}
 
 	public static function add_rewrite_rule() {

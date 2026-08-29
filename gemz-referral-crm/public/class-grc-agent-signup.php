@@ -16,7 +16,11 @@ class GRC_Agent_Signup {
 
 	public static function render_form( $atts ) {
 		if ( is_user_logged_in() ) {
-			return '<p class="gemz-portal-notice">You\'re already logged in. Visit your agent dashboard to see your referral code.</p>';
+			$portal = GRC_Roles::get_portal_link_for_current_user();
+			if ( $portal['url'] ) {
+				return '<p class="gemz-portal-notice">You\'re already logged in. <a href="' . esc_url( $portal['url'] ) . '">Go to your ' . esc_html( $portal['label'] ) . '</a>.</p>';
+			}
+			return '<p class="gemz-portal-notice">You\'re already logged in, but this account isn\'t set up as an agent or partner.</p>';
 		}
 
 		ob_start();
