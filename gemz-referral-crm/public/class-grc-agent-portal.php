@@ -50,6 +50,9 @@ class GRC_Agent_Portal {
 		$payment = ! empty( $agent->payment_details ) ? json_decode( $agent->payment_details, true ) : array();
 		$method  = $agent->payment_method ?: '';
 		$saved   = ! empty( $_GET['payment_saved'] );
+		$referral_link = add_query_arg( 'ref', $agent->referral_code, home_url( '/' ) );
+		$password_changed = ! empty( $_GET['password_changed'] );
+		$password_error   = sanitize_text_field( $_GET['password_error'] ?? '' );
 
 		ob_start();
 		?>
@@ -84,6 +87,39 @@ class GRC_Agent_Portal {
 					<span class="gemz-stat-value">$<?php echo esc_html( number_format( $paid, 2 ) ); ?></span>
 				</div>
 			</div>
+
+			<h3>Your referral link</h3>
+			<p class="gemz-portal-hint">Share this link, or the QR code below, instead of just your bare code - it's ready to click.</p>
+			<div class="gemz-referral-link-row">
+				<input type="text" id="gemz-referral-link-input" readonly value="<?php echo esc_url( $referral_link ); ?>">
+				<button type="button" id="gemz-copy-referral-link" class="gemz-btn">Copy</button>
+			</div>
+			<div id="gemz-referral-qr" data-link="<?php echo esc_attr( $referral_link ); ?>" class="gemz-referral-qr"></div>
+			<p><button type="button" id="gemz-download-qr" class="gemz-btn gemz-btn-ghost">Download QR code (PNG)</button></p>
+
+			<h3>Change your password</h3>
+			<?php if ( $password_changed ) : ?>
+				<p class="gemz-portal-success">Your password was updated.</p>
+			<?php elseif ( $password_error ) : ?>
+				<p class="gemz-portal-notice" style="color:#a00;"><?php echo esc_html( $password_error ); ?></p>
+			<?php endif; ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="gemz-payment-form" id="gemz-change-password-form">
+				<?php wp_nonce_field( 'grc_change_own_password' ); ?>
+				<input type="hidden" name="action" value="grc_change_own_password">
+				<input type="hidden" name="redirect_to" value="<?php echo esc_url( home_url( '/agent-portal/' ) ); ?>">
+
+				<label for="gemz_current_password">Current password</label>
+				<input type="password" id="gemz_current_password" name="current_password" required>
+
+				<label for="gemz_new_password">New password</label>
+				<input type="password" id="gemz_new_password" name="new_password" required minlength="8">
+
+				<label for="gemz_confirm_password">Confirm new password</label>
+				<input type="password" id="gemz_confirm_password" name="confirm_password" required minlength="8">
+
+				<button type="submit" class="gemz-btn">Update password</button>
+				<p class="gemz-form-message" role="status" aria-live="polite"></p>
+			</form>
 
 			<h3>Payout method</h3>
 			<p class="gemz-portal-hint">Only you can see or change this - the site admin cannot edit it for you.</p>

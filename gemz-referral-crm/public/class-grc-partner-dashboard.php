@@ -64,6 +64,8 @@ class GRC_Partner_Dashboard {
 			}
 		}
 		$success_rate = $total_deals > 0 ? round( ( $closed_deals / $total_deals ) * 100 ) . '%' : '—';
+		$password_changed = ! empty( $_GET['password_changed'] );
+		$password_error   = sanitize_text_field( $_GET['password_error'] ?? '' );
 
 		ob_start();
 		?>
@@ -105,6 +107,30 @@ class GRC_Partner_Dashboard {
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+
+			<h3>Change your password</h3>
+			<?php if ( $password_changed ) : ?>
+				<p class="gemz-portal-success">Your password was updated.</p>
+			<?php elseif ( $password_error ) : ?>
+				<p class="gemz-portal-notice" style="color:#a00;"><?php echo esc_html( $password_error ); ?></p>
+			<?php endif; ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="gemz-payment-form" id="gemz-change-password-form">
+				<?php wp_nonce_field( 'grc_change_own_password' ); ?>
+				<input type="hidden" name="action" value="grc_change_own_password">
+				<input type="hidden" name="redirect_to" value="<?php echo esc_url( home_url( '/partner-portal/' ) ); ?>">
+
+				<label for="gemz_current_password">Current password</label>
+				<input type="password" id="gemz_current_password" name="current_password" required>
+
+				<label for="gemz_new_password">New password</label>
+				<input type="password" id="gemz_new_password" name="new_password" required minlength="8">
+
+				<label for="gemz_confirm_password">Confirm new password</label>
+				<input type="password" id="gemz_confirm_password" name="confirm_password" required minlength="8">
+
+				<button type="submit" class="gemz-btn">Update password</button>
+				<p class="gemz-form-message" role="status" aria-live="polite"></p>
+			</form>
 		</div>
 		<?php
 		return ob_get_clean();

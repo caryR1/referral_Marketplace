@@ -13,6 +13,9 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_approve_partner', array( __CLASS__, 'handle_approve_partner' ) );
 		add_action( 'admin_post_grc_reject_partner', array( __CLASS__, 'handle_reject_partner' ) );
 		add_action( 'admin_post_grc_delete_partner', array( __CLASS__, 'handle_delete_partner' ) );
+		add_action( 'admin_post_grc_save_agent_segment', array( __CLASS__, 'handle_save_agent_segment' ) );
+		add_action( 'admin_post_grc_assign_agent_segment', array( __CLASS__, 'handle_assign_agent_segment' ) );
+		add_action( 'admin_post_grc_change_own_password', array( __CLASS__, 'handle_change_own_password' ) );
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
 		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
 		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
@@ -75,6 +78,7 @@ class GRC_Admin {
 		add_submenu_page( 'grc-dashboard', 'Campaigns', 'Campaigns', 'grc_manage_campaigns', 'grc-campaigns', array( __CLASS__, 'render_campaigns' ) );
 		add_submenu_page( 'grc-dashboard', 'Leads', 'Leads', 'grc_manage_leads', 'grc-leads', array( __CLASS__, 'render_leads' ) );
 		add_submenu_page( 'grc-dashboard', 'Agents', 'Agents', 'grc_manage_agents', 'grc-agents', array( __CLASS__, 'render_agents' ) );
+		add_submenu_page( 'grc-dashboard', 'Segments', 'Segments', 'grc_manage_agents', 'grc-segments', array( __CLASS__, 'render_segments' ) );
 		add_submenu_page( 'grc-dashboard', 'Payouts', 'Payouts', 'grc_manage_commissions', 'grc-payouts', array( __CLASS__, 'render_payouts' ) );
 		add_submenu_page( 'grc-dashboard', 'Reports', 'Reports', 'grc_view_reports', 'grc-reports', array( __CLASS__, 'render_reports' ) );
 		add_submenu_page( 'grc-dashboard', 'Email Templates', 'Email Templates', 'manage_options', 'grc-email-templates', array( __CLASS__, 'render_email_templates' ) );
@@ -101,6 +105,10 @@ class GRC_Admin {
 
 	public static function render_agents() {
 		include GRC_PLUGIN_DIR . 'admin/views/agents.php';
+	}
+
+	public static function render_segments() {
+		include GRC_PLUGIN_DIR . 'admin/views/segments.php';
 	}
 
 	public static function render_reports() {
@@ -320,6 +328,109 @@ class GRC_Admin {
 		self::audit_log( 'partner', $partner_id, 'deleted' );
 
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&outreach_updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Saves a new agent segment. Tagging only - deliberately no
+	 * messaging/campaign logic here yet.
+	 */
+	public static function handle_save_agent_segment() {
+		if ( ! current_user_can( 'grc_manage_agents' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_save_agent_segment' );
+
+		$name = sanitize_text_field( $_POST['name'] ?? '' );
+		if ( empty( $name ) ) {
+			wp_die( 'Segment name is required.' );
+		}
+
+		global $wpdb;
+		$result = $wpdb->insert( GRC_DB::table( 'agent_segments' ), array(
+			'name'        => $name,
+			'description' => sanitize_textarea_field( $_POST['description'] ?? '' ),
+			'created_at'  => current_time( 'mysql' ),
+		) );
+
+		if ( false === $result ) {
+			wp_die( 'Could not save segment: ' . esc_html( $wpdb->last_error ) );
+		}
+
+		self::audit_log( 'agent_segment', $wpdb->insert_id, 'created', array( 'name' => $name ) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-segments&saved=1' ) );
+		exit;
+	}
+
+	/**
+	 * Assigns (or clears) an agent's segment from the Agents screen.
+	 */
+	public static function handle_assign_agent_segment() {
+		if ( ! current_user_can( 'grc_manage_agents' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_assign_agent_segment' );
+
+		global $wpdb;
+		$agent_id = absint( $_POST['agent_id'] ?? 0 );
+		$segment_id = absint( $_POST['segment_id'] ?? 0 ) ?: null;
+
+		$wpdb->update( GRC_DB::table( 'agents' ), array(
+			'segment_id' => $segment_id,
+			'updated_at' => current_time( 'mysql' ),
+		), array( 'id' => $agent_id ) );
+
+		self::audit_log( 'agent', $agent_id, 'segment_assigned', array( 'segment_id' => $segment_id ) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-agents&segment_updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Lets a logged-in agent or partner change their own password from
+	 * their portal, scoped strictly to get_current_user_id() - never a
+	 * posted user ID. Re-checks the current password server-side via
+	 * wp_check_password() even though the session is already
+	 * authenticated, as defense in depth beyond the nonce (e.g. against
+	 * a hijacked/shared session being used to lock the real owner out).
+	 */
+	public static function handle_change_own_password() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( 'You must be logged in.' );
+		}
+		check_admin_referer( 'grc_change_own_password' );
+
+		$redirect_to = esc_url_raw( $_POST['redirect_to'] ?? home_url( '/' ) );
+		$user = wp_get_current_user();
+
+		$current_password = (string) ( $_POST['current_password'] ?? '' );
+		$new_password     = (string) ( $_POST['new_password'] ?? '' );
+		$confirm_password = (string) ( $_POST['confirm_password'] ?? '' );
+
+		if ( ! wp_check_password( $current_password, $user->user_pass, $user->ID ) ) {
+			wp_safe_redirect( add_query_arg( 'password_error', rawurlencode( 'Current password is incorrect.' ), $redirect_to ) );
+			exit;
+		}
+		if ( strlen( $new_password ) < 8 ) {
+			wp_safe_redirect( add_query_arg( 'password_error', rawurlencode( 'New password must be at least 8 characters.' ), $redirect_to ) );
+			exit;
+		}
+		if ( $new_password !== $confirm_password ) {
+			wp_safe_redirect( add_query_arg( 'password_error', rawurlencode( 'New password and confirmation don\'t match.' ), $redirect_to ) );
+			exit;
+		}
+
+		wp_set_password( $new_password, $user->ID );
+
+		// wp_set_password() destroys the session, so log back in immediately
+		// rather than bouncing the user to a login screen for a change they
+		// just made themselves.
+		wp_set_auth_cookie( $user->ID );
+
+		self::audit_log( 'user', $user->ID, 'password_changed' );
+
+		wp_safe_redirect( add_query_arg( 'password_changed', '1', $redirect_to ) );
 		exit;
 	}
 

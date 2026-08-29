@@ -109,11 +109,13 @@ class GRC_Public {
 		}
 
 		if ( $has_portal ) {
-			wp_enqueue_script( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/js/agent-portal.js', array(), GRC_VERSION, true );
+			wp_enqueue_script( 'grc-vendor-qrcode', GRC_PLUGIN_URL . 'assets/js/vendor-qrcode.js', array(), GRC_VERSION, true );
+			wp_enqueue_script( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/js/agent-portal.js', array( 'grc-vendor-qrcode' ), GRC_VERSION, true );
 			wp_enqueue_style( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/css/agent-portal.css', array( 'grc-brand-tokens' ), GRC_VERSION );
 		}
 
 		if ( $has_partner_dashboard ) {
+			wp_enqueue_script( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/js/agent-portal.js', array(), GRC_VERSION, true );
 			wp_enqueue_style( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/css/agent-portal.css', array( 'grc-brand-tokens' ), GRC_VERSION );
 		}
 

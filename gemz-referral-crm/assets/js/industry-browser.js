@@ -69,13 +69,26 @@
 						emptyState.style.display = 'block';
 						return;
 					}
+					// offer.link is a bare /go/{slug} URL with no ?ref= - without this,
+					// an agent's generic homepage link (?ref=CODE) loses attribution
+					// the moment a visitor uses this widget instead of a campaign-
+					// specific /go/ link. Carry the current page's ref (and
+					// campaign_id, if present) forward onto every offer link.
+					var pageParams = new URLSearchParams( window.location.search );
+					var ref = pageParams.get( 'ref' );
+					var campaignId = pageParams.get( 'campaign_id' );
+
 					offers.forEach( function ( offer ) {
+						var offerUrl = new URL( offer.link, window.location.origin );
+						if ( ref ) offerUrl.searchParams.set( 'ref', ref );
+						if ( campaignId ) offerUrl.searchParams.set( 'campaign_id', campaignId );
+
 						var card = document.createElement( 'div' );
 						card.className = 'gemz-offer-card';
 						card.innerHTML =
 							'<div><h4>' + selectedIndustryLabel + ' Cashback Available</h4>' +
 							'<p>Serving your area &middot; get cash back when you book through us</p></div>' +
-							'<a class="gemz-btn" href="' + offer.link + '">Get My Cashback</a>';
+							'<a class="gemz-btn" href="' + offerUrl.toString() + '">Get My Cashback</a>';
 						resultsWrap.appendChild( card );
 					} );
 				} )

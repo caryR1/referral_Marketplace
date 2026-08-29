@@ -143,3 +143,38 @@
 .gemz-portal-table tr:last-child td {
 	border-bottom: none;
 }
+
+.gemz-referral-link-row {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.gemz-referral-link-row input {
+	flex: 1;
+	padding: 11px 14px;
+	border: 1px solid var(--gemz-line);
+	border-radius: var(--gemz-radius-sm);
+	font-size: 14px;
+	background: var(--gemz-bg);
+	color: var(--gemz-slate);
+}
+
+.gemz-referral-link-row .gemz-btn {
+	flex-shrink: 0;
+}
+
+.gemz-referral-qr {
+	background: var(--gemz-white);
+	border: 1px solid var(--gemz-line);
+	border-radius: var(--gemz-radius);
+	padding: 16px;
+	display: inline-block;
+	box-shadow: var(--gemz-shadow);
+}
+
+.gemz-referral-qr svg {
+	display: block;
+	width: 180px;
+	height: 180px;
+}
