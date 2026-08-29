@@ -261,7 +261,18 @@ if ( ! empty( $_GET['edit'] ) ) {
 							&mdash;
 						<?php endif; ?>
 					</td>
-					<td><a href="<?php echo esc_url( admin_url( 'admin.php?page=grc-partners&edit=' . $p->id ) ); ?>">Edit</a></td>
+					<td>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=grc-partners&edit=' . $p->id ) ); ?>">Edit</a>
+						<?php if ( in_array( $outreach, array( 'new', 'rejected' ), true ) ) : ?>
+							<br>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete this partner permanently? This cannot be undone.');">
+								<?php wp_nonce_field( 'grc_delete_partner' ); ?>
+								<input type="hidden" name="action" value="grc_delete_partner">
+								<input type="hidden" name="partner_id" value="<?php echo esc_attr( $p->id ); ?>">
+								<button type="submit" class="button-link" style="color:#a00;">Delete</button>
+							</form>
+						<?php endif; ?>
+					</td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>

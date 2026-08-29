@@ -60,6 +60,132 @@ class GRC_REST_API {
 			'callback'            => array( __CLASS__, 'claim_cashback' ),
 			'permission_callback' => '__return_true', // public: the claim_token itself is the auth, no login exists for customers
 		) );
+
+		register_rest_route( self::NAMESPACE_, '/partners/research-batch', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'ingest_partner_research_batch' ),
+			'permission_callback' => function () {
+				return current_user_can( 'grc_manage_partners' );
+			},
+		) );
+	}
+
+	/**
+	 * Ingests a batch of candidate fulfillment partners found by a
+	 * research pass (industry/state/min-commission/etc are whatever
+	 * criteria that pass used - not re-validated here beyond min
+	 * commission, since the actual searching/verification happens
+	 * outside PHP). Every accepted candidate lands with outreach_status
+	 * 'new' and live status 'paused' - a researched partner must never
+	 * silently start receiving real leads before someone reviews it.
+	 *
+	 * Dedup is by normalized website first, company name second, against
+	 * every existing partner regardless of industry/status - and also
+	 * within the same batch, so submitting overlapping results twice
+	 * (or the same batch retried) can't create duplicate rows.
+	 */
+	public static function ingest_partner_research_batch( WP_REST_Request $request ) {
+		global $wpdb;
+		$params = $request->get_json_params();
+
+		$candidates = $params['candidates'] ?? array();
+		if ( empty( $candidates ) || ! is_array( $candidates ) ) {
+			return new WP_Error( 'grc_no_candidates', 'No candidates provided.', array( 'status' => 400 ) );
+		}
+		$min_commission = isset( $params['min_commission'] ) ? (float) $params['min_commission'] : 0;
+
+		$partners_table = GRC_DB::table( 'partners' );
+		$batch_id = 'batch_' . gmdate( 'Ymd_His' ) . '_' . wp_generate_password( 6, false, false );
+		$now = current_time( 'mysql' );
+
+		$known = array();
+		foreach ( $wpdb->get_results( "SELECT website, name FROM {$partners_table}" ) as $row ) {
+			$known[] = array(
+				'website' => self::normalize_website_for_dedup( $row->website ),
+				'name'    => strtolower( trim( $row->name ) ),
+			);
+		}
+
+		$valid_industries = array_keys( GRC_Industries::all() );
+		$added = array();
+		$skipped = array();
+
+		foreach ( $candidates as $c ) {
+			$name        = sanitize_text_field( $c['name'] ?? '' );
+			$industry    = sanitize_text_field( $c['industry'] ?? '' );
+			$website     = esc_url_raw( $c['website'] ?? '' );
+			$commission  = isset( $c['commission_amount'] ) ? (float) $c['commission_amount'] : 0;
+
+			if ( empty( $name ) || ! in_array( $industry, $valid_industries, true ) ) {
+				$skipped[] = array( 'name' => $name ?: '(unnamed)', 'reason' => 'missing name or invalid industry' );
+				continue;
+			}
+			if ( $commission < $min_commission ) {
+				$skipped[] = array( 'name' => $name, 'reason' => "commission \${$commission} below \${$min_commission} minimum" );
+				continue;
+			}
+
+			$norm_website = self::normalize_website_for_dedup( $website );
+			$norm_name    = strtolower( trim( $name ) );
+			$is_duplicate = false;
+			foreach ( $known as $k ) {
+				if ( $norm_website && $k['website'] && $norm_website === $k['website'] ) {
+					$is_duplicate = true;
+					break;
+				}
+				if ( ! $norm_website && $norm_name === $k['name'] ) {
+					$is_duplicate = true;
+					break;
+				}
+			}
+			if ( $is_duplicate ) {
+				$skipped[] = array( 'name' => $name, 'reason' => 'duplicate (matches an existing partner)' );
+				continue;
+			}
+
+			$result = $wpdb->insert( $partners_table, array(
+				'name'              => $name,
+				'industry'          => $industry,
+				'contact_name'      => sanitize_text_field( $c['contact_name'] ?? '' ),
+				'phone'             => sanitize_text_field( $c['phone'] ?? '' ),
+				'email'             => sanitize_email( $c['email'] ?? '' ),
+				'website'           => $website,
+				'service_areas'     => wp_json_encode( array() ),
+				'payout_amount'     => $commission,
+				'payout_type'       => 'flat',
+				'status'            => 'paused', // not live until approved + service areas are set
+				'outreach_status'   => 'new',
+				'source_url'        => esc_url_raw( $c['source_url'] ?? '' ),
+				'discovered_via'    => 'research',
+				'research_batch_id' => $batch_id,
+				'created_at'        => $now,
+				'updated_at'        => $now,
+			) );
+			if ( false === $result ) {
+				$skipped[] = array( 'name' => $name, 'reason' => 'db error: ' . $wpdb->last_error );
+				continue;
+			}
+			$new_id = $wpdb->insert_id;
+
+			$added[] = array( 'id' => $new_id, 'name' => $name, 'industry' => $industry, 'commission_amount' => $commission );
+			$known[] = array( 'website' => $norm_website, 'name' => $norm_name ); // prevents dupes within this same batch
+
+			if ( class_exists( 'GRC_Admin' ) ) {
+				GRC_Admin::audit_log( 'partner', $new_id, 'research_added', array( 'batch_id' => $batch_id, 'source_url' => $c['source_url'] ?? '' ) );
+			}
+		}
+
+		return rest_ensure_response( array( 'batch_id' => $batch_id, 'added' => $added, 'skipped' => $skipped ) );
+	}
+
+	private static function normalize_website_for_dedup( $url ) {
+		if ( empty( $url ) ) {
+			return '';
+		}
+		$url = strtolower( trim( $url ) );
+		$url = preg_replace( '#^https?://#', '', $url );
+		$url = preg_replace( '#^www\.#', '', $url );
+		return rtrim( $url, '/' );
 	}
 
 	/**

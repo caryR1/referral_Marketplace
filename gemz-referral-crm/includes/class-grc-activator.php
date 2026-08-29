@@ -254,5 +254,52 @@ class GRC_Activator {
 		foreach ( $statements as $sql ) {
 			dbDelta( $sql );
 		}
+
+		self::patch_missing_columns();
+	}
+
+	/**
+	 * dbDelta is unreliable at adding MULTIPLE new columns to an
+	 * existing table in one pass - observed in production adding 8 new
+	 * columns to `partners` in a single CREATE TABLE re-run: it silently
+	 * stopped partway through (added everything through discovered_via,
+	 * never added research_batch_id or user_id), with no error of any
+	 * kind. This runs a real ALTER TABLE for any column dbDelta should
+	 * have added but didn't, checked against SHOW COLUMNS directly
+	 * rather than trusting dbDelta's own result. Cheap and safe to run
+	 * on every request that hits create_tables() (the plugins_loaded
+	 * version-mismatch check), since it's a no-op once columns exist.
+	 */
+	private static function patch_missing_columns() {
+		global $wpdb;
+
+		$expected = array(
+			'partners' => array(
+				'outreach_status'   => "VARCHAR(20) NOT NULL DEFAULT 'new'",
+				'contacted_at'      => 'DATETIME NULL',
+				'rejection_reason'  => 'TEXT NULL',
+				'unusual_terms'     => 'TEXT NULL',
+				'source_url'        => 'VARCHAR(500) NULL',
+				'discovered_via'    => "VARCHAR(20) NOT NULL DEFAULT 'manual'",
+				'research_batch_id' => 'VARCHAR(40) NULL',
+				'user_id'           => 'BIGINT UNSIGNED NULL',
+			),
+			'agents' => array(
+				'segment_id' => 'BIGINT UNSIGNED NULL',
+			),
+		);
+
+		foreach ( $expected as $short_name => $columns ) {
+			$table = GRC_DB::table( $short_name );
+			$existing = $wpdb->get_col( "DESCRIBE {$table}", 0 );
+			if ( empty( $existing ) ) {
+				continue; // table itself doesn't exist yet (shouldn't happen after dbDelta, but don't ALTER a missing table)
+			}
+			foreach ( $columns as $column => $definition ) {
+				if ( ! in_array( $column, $existing, true ) ) {
+					$wpdb->query( "ALTER TABLE {$table} ADD COLUMN {$column} {$definition}" ); // phpcs:ignore -- $column/$definition come from the fixed whitelist above, not user input
+				}
+			}
+		}
 	}
 }

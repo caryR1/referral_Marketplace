@@ -12,10 +12,12 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_mark_partner_contacted', array( __CLASS__, 'handle_mark_partner_contacted' ) );
 		add_action( 'admin_post_grc_approve_partner', array( __CLASS__, 'handle_approve_partner' ) );
 		add_action( 'admin_post_grc_reject_partner', array( __CLASS__, 'handle_reject_partner' ) );
+		add_action( 'admin_post_grc_delete_partner', array( __CLASS__, 'handle_delete_partner' ) );
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
 		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
 		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
 		add_action( 'admin_post_grc_save_smtp_settings', array( __CLASS__, 'handle_save_smtp_settings' ) );
+		add_action( 'admin_post_grc_save_research_defaults', array( __CLASS__, 'handle_save_research_defaults' ) );
 		add_action( 'admin_post_grc_mark_customer_payout_paid', array( __CLASS__, 'handle_mark_customer_payout_paid' ) );
 		add_action( 'admin_post_grc_mark_commission_paid', array( __CLASS__, 'handle_mark_commission_paid' ) );
 		add_action( 'grc_daily_stale_lead_check', array( __CLASS__, 'check_stale_leads' ) );
@@ -290,6 +292,35 @@ class GRC_Admin {
 	}
 
 	/**
+	 * Deletes a partner outright - only allowed while still 'new' or
+	 * 'rejected' (never contacted/approved), so a real, live relationship
+	 * can't be deleted by accident; use the live Status field to pause/
+	 * drop an actual partner instead. Mainly for bad research candidates
+	 * or test rows.
+	 */
+	public static function handle_delete_partner() {
+		if ( ! current_user_can( 'grc_manage_partners' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_delete_partner' );
+
+		global $wpdb;
+		$partner_id = absint( $_POST['partner_id'] ?? 0 );
+		$table = GRC_DB::table( 'partners' );
+
+		$partner = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $partner_id ) );
+		if ( ! $partner || ! in_array( $partner->outreach_status, array( 'new', 'rejected' ), true ) ) {
+			wp_die( 'Only partners that are still "new" or "rejected" can be deleted. Use the live Status field to pause/drop an actual partner instead.' );
+		}
+
+		$wpdb->delete( $table, array( 'id' => $partner_id ) );
+		self::audit_log( 'partner', $partner_id, 'deleted' );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&outreach_updated=1' ) );
+		exit;
+	}
+
+	/**
 	 * Business (Mon-Fri) days elapsed between a MySQL datetime and now -
 	 * used to compute the "overdue" badge (>=3) on uncontacted partners.
 	 * No holiday calendar - not specified, and not worth the complexity
@@ -470,6 +501,31 @@ class GRC_Admin {
 		) );
 
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-settings&smtp_saved=1' ) );
+		exit;
+	}
+
+	/**
+	 * Saves the default parameters for a partner research pass. Purely
+	 * a stored preference for whoever/whatever runs the next pass to
+	 * read - saving this does not itself trigger any search.
+	 */
+	public static function handle_save_research_defaults() {
+		if ( ! current_user_can( 'grc_manage_partners' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_save_research_defaults' );
+
+		$valid_industries = array_keys( GRC_Industries::all() );
+		$industries = array_values( array_intersect( (array) ( $_POST['research_industries'] ?? array() ), $valid_industries ) );
+
+		update_option( 'grc_research_industries', $industries );
+		update_option( 'grc_research_states', sanitize_text_field( $_POST['research_states'] ?? '' ) );
+		update_option( 'grc_research_min_commission', floatval( $_POST['research_min_commission'] ?? 0 ) );
+		update_option( 'grc_research_radius', sanitize_text_field( $_POST['research_radius'] ?? '' ) );
+		update_option( 'grc_research_date_range', sanitize_text_field( $_POST['research_date_range'] ?? '' ) );
+		update_option( 'grc_research_count', absint( $_POST['research_count'] ?? 1 ) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-settings&research_saved=1' ) );
 		exit;
 	}
 

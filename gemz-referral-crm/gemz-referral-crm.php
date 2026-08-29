@@ -3,7 +3,7 @@
  * Plugin Name: Gemz Referral CRM
  * Plugin URI: https://refer.gemzonline.com
  * Description: Custom CRM + funnel + payout system for the Gemz referral/cashback platform (roofing, HVAC, solar referrals). Manages fulfillment partners, leads, agents, multi-level commissions, campaigns, appointments, and notifications.
- * Version: 0.7.0
+ * Version: 0.8.4
  * Author: Gemz
  * Text Domain: gemz-referral-crm
  * Requires at least: 6.0
@@ -17,11 +17,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-define( 'GRC_VERSION', '0.7.0' );
+define( 'GRC_VERSION', '0.8.4' );
 define( 'GRC_PLUGIN_FILE', __FILE__ );
 define( 'GRC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GRC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'GRC_DB_VERSION', '0.4.0' ); // bump this whenever schema changes; activator checks it.
+define( 'GRC_DB_VERSION', '0.4.1' ); // bump this whenever schema changes; activator checks it.
 
 // ---------------------------------------------------------------------------
 // Includes (order matters: db schema/helpers first, then things that use them)

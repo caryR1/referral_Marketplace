@@ -19,6 +19,13 @@ $smtp_username    = get_option( 'grc_smtp_username', '' );
 $has_smtp_password = (bool) get_option( 'grc_smtp_password', '' );
 $smtp_from_email  = get_option( 'grc_smtp_from_email', '' );
 $smtp_from_name   = get_option( 'grc_smtp_from_name', 'Gemz' );
+
+$research_industries      = get_option( 'grc_research_industries', array( 'roofing', 'hvac', 'solar', 'windows_doors' ) );
+$research_states          = get_option( 'grc_research_states', '' );
+$research_min_commission  = get_option( 'grc_research_min_commission', '500' );
+$research_radius          = get_option( 'grc_research_radius', '' );
+$research_date_range      = get_option( 'grc_research_date_range', '' );
+$research_count           = get_option( 'grc_research_count', '1' );
 ?>
 <div class="wrap">
 	<h1>Settings</h1>
@@ -34,6 +41,9 @@ $smtp_from_name   = get_option( 'grc_smtp_from_name', 'Gemz' );
 	<?php endif; ?>
 	<?php if ( ! empty( $_GET['smtp_saved'] ) ) : ?>
 		<div class="notice notice-success"><p>Email (SMTP) settings saved.</p></div>
+	<?php endif; ?>
+	<?php if ( ! empty( $_GET['research_saved'] ) ) : ?>
+		<div class="notice notice-success"><p>Partner research defaults saved.</p></div>
 	<?php endif; ?>
 
 	<h2>Plugin Info</h2>
@@ -61,6 +71,51 @@ $smtp_from_name   = get_option( 'grc_smtp_from_name', 'Gemz' );
 			</tr>
 		</table>
 		<?php submit_button( 'Save Commission Split' ); ?>
+	</form>
+
+	<hr>
+
+	<h2>Partner Research</h2>
+	<p class="description">
+		Finding, verifying, and sourcing real candidate companies requires actual judgment (reading their pages, confirming a real commission program exists) - it isn't something a scheduled PHP job can do on its own, so a research pass is run on request rather than automatically. These are just the default parameters that pass uses; they don't trigger a search by themselves.
+	</p>
+	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<?php wp_nonce_field( 'grc_save_research_defaults' ); ?>
+		<input type="hidden" name="action" value="grc_save_research_defaults">
+		<table class="form-table">
+			<tr>
+				<th>Industries</th>
+				<td>
+					<?php foreach ( GRC_Industries::all() as $ind => $label ) : ?>
+						<label style="display:inline-block; margin:0 14px 6px 0;">
+							<input type="checkbox" name="research_industries[]" value="<?php echo esc_attr( $ind ); ?>" <?php checked( in_array( $ind, (array) $research_industries, true ) ); ?>>
+							<?php echo esc_html( $label ); ?>
+						</label>
+					<?php endforeach; ?>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="research_states">Target States</label></th>
+				<td><input type="text" id="research_states" name="research_states" class="regular-text" value="<?php echo esc_attr( $research_states ); ?>" placeholder="e.g. TX, FL, AZ (blank = nationally, prioritizing strong markets)"></td>
+			</tr>
+			<tr>
+				<th><label for="research_min_commission">Minimum Commission ($)</label></th>
+				<td><input type="number" step="1" id="research_min_commission" name="research_min_commission" value="<?php echo esc_attr( $research_min_commission ); ?>"></td>
+			</tr>
+			<tr>
+				<th><label for="research_radius">City/Zip Radius</label></th>
+				<td><input type="text" id="research_radius" name="research_radius" value="<?php echo esc_attr( $research_radius ); ?>" placeholder="e.g. 50mi around Dallas, TX (optional)"></td>
+			</tr>
+			<tr>
+				<th><label for="research_date_range">Date Range</label></th>
+				<td><input type="text" id="research_date_range" name="research_date_range" value="<?php echo esc_attr( $research_date_range ); ?>" placeholder="e.g. programs updated/verified in the last 12 months (optional)"></td>
+			</tr>
+			<tr>
+				<th><label for="research_count">Companies to Search For (per industry)</label></th>
+				<td><input type="number" step="1" min="1" id="research_count" name="research_count" value="<?php echo esc_attr( $research_count ); ?>"></td>
+			</tr>
+		</table>
+		<?php submit_button( 'Save Research Defaults' ); ?>
 	</form>
 
 	<hr>
