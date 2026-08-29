@@ -18,7 +18,7 @@ class GRC_Email_Templates {
 	public static function variables_for( $event_key ) {
 		$common = array( 'customer_name', 'agent_name', 'partner_name' );
 		$map = array(
-			'agent_signup'             => array( 'agent_name', 'referral_code' ),
+			'agent_signup'             => array( 'agent_name', 'referral_code', 'referral_link' ),
 			'appointment_booked'       => array( 'customer_name', 'appointment_date' ),
 			'appointment_changed'      => array( 'customer_name', 'appointment_date' ),
 			'lead_accepted_by_partner' => array( 'agent_name', 'customer_name' ),
@@ -158,6 +158,7 @@ class GRC_Email_Templates {
 			'agent_name'         => 'Alex Rivera',
 			'partner_name'       => 'Roofs By Rhino',
 			'referral_code'      => 'AG-7F3K2Q',
+			'referral_link'      => home_url( '/?ref=AG-7F3K2Q' ),
 			'appointment_date'   => 'Tuesday, Sept 2 at 10:00 AM',
 			'milestone_label'    => 'Permit approved',
 			'amount'             => '175.00',

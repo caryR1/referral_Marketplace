@@ -358,16 +358,19 @@ class GRC_REST_API {
 		) );
 		$agent_id = $wpdb->insert_id;
 
+		$referral_link = add_query_arg( 'ref', $referral_code, home_url( '/' ) );
+
 		GRC_Notifications::send( 'agent_signup', 'agent', $email, 'email', array(
 			'agent_name'    => $full_name,
 			'referral_code' => $referral_code,
+			'referral_link' => $referral_link,
 		) );
 
 		if ( class_exists( 'GRC_Admin' ) ) {
 			GRC_Admin::audit_log( 'agent', $agent_id, 'self_registered', array( 'email' => $email, 'sponsor_agent_id' => $sponsor_agent_id ) );
 		}
 
-		return rest_ensure_response( array( 'success' => true, 'referral_code' => $referral_code ) );
+		return rest_ensure_response( array( 'success' => true, 'referral_code' => $referral_code, 'referral_link' => $referral_link ) );
 	}
 
 	public static function coverage_search( WP_REST_Request $request ) {

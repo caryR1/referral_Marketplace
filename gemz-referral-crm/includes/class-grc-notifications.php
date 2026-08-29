@@ -75,7 +75,7 @@ class GRC_Notifications {
 		return array(
 			'agent_signup' => array(
 				'subject' => 'Welcome to the Gemz Referral Program',
-				'body'    => "Hi {{agent_name}},\n\nWelcome aboard! Your referral code is {{referral_code}}.\n\nShare your campaign links and start earning.\n\n- The Gemz Team",
+				'body'    => "Hi {{agent_name}},\n\nWelcome aboard! Your referral code is {{referral_code}}.\n\nHere's your personal referral link, ready to share:\n{{referral_link}}\n\n- The Gemz Team",
 			),
 			'appointment_booked' => array(
 				'subject' => 'Your appointment is set',

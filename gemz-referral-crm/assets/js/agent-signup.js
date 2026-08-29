@@ -31,8 +31,24 @@
 				.then( function ( res ) { return res.json(); } )
 				.then( function ( data ) {
 					if ( data && data.success ) {
-						form.style.display = 'none';
-						msg.textContent = 'Welcome aboard! Your referral code is ' + data.referral_code + '. Check your email, then log in to see your dashboard.';
+						// msg lives inside the form, so hiding the whole form would
+						// hide this success message with it - hide only the fields/
+						// button instead.
+						Array.prototype.forEach.call( form.children, function ( child ) {
+							if ( child !== msg ) {
+								child.style.display = 'none';
+							}
+						} );
+
+						msg.textContent = '';
+						msg.appendChild( document.createTextNode( 'Welcome aboard! Your referral code is ' + data.referral_code + '. Here’s your personal referral link, ready to share: ' ) );
+						if ( data.referral_link ) {
+							var refLink = document.createElement( 'a' );
+							refLink.href = data.referral_link;
+							refLink.textContent = data.referral_link;
+							msg.appendChild( refLink );
+						}
+						msg.appendChild( document.createTextNode( ' Check your email, then log in to see your dashboard.' ) );
 						msg.classList.add( 'grc-success' );
 					} else {
 						btn.disabled = false;
