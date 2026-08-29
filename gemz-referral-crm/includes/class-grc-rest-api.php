@@ -416,7 +416,10 @@ class GRC_REST_API {
 		$agent_id = null;
 		if ( ! empty( $params['ref'] ) ) {
 			$agent = GRC_Referral_Codes::get_agent_by_code( sanitize_text_field( $params['ref'] ) );
-			if ( $agent ) {
+			// A suspended agent's link stops crediting new leads (falls
+			// back to organic/direct) - this is what actually makes
+			// "suspend" mean something, rather than just a label.
+			if ( $agent && 'active' === $agent->status ) {
 				$agent_id = $agent->id;
 			}
 		}

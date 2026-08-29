@@ -16,6 +16,7 @@ class GRC_Admin {
 		add_action( 'admin_post_grc_save_agent_segment', array( __CLASS__, 'handle_save_agent_segment' ) );
 		add_action( 'admin_post_grc_assign_agent_segment', array( __CLASS__, 'handle_assign_agent_segment' ) );
 		add_action( 'admin_post_grc_change_own_password', array( __CLASS__, 'handle_change_own_password' ) );
+		add_action( 'admin_post_grc_toggle_agent_status', array( __CLASS__, 'handle_toggle_agent_status' ) );
 		add_action( 'admin_post_grc_save_campaign', array( __CLASS__, 'handle_save_campaign' ) );
 		add_action( 'admin_post_grc_save_commission_split', array( __CLASS__, 'handle_save_commission_split' ) );
 		add_action( 'admin_post_grc_save_whatsapp_settings', array( __CLASS__, 'handle_save_whatsapp_settings' ) );
@@ -328,6 +329,41 @@ class GRC_Admin {
 		self::audit_log( 'partner', $partner_id, 'deleted' );
 
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&outreach_updated=1' ) );
+		exit;
+	}
+
+	/**
+	 * Suspends or reactivates an agent - deliberately no delete action for
+	 * agents: a suspended agent's referral code stops crediting new leads
+	 * (enforced wherever agent status is checked going forward) but their
+	 * history (leads, commissions, audit trail) stays intact rather than
+	 * being destroyed. This is the intended way to disable a bad/test/
+	 * inactive agent.
+	 */
+	public static function handle_toggle_agent_status() {
+		if ( ! current_user_can( 'grc_manage_agents' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'grc_toggle_agent_status' );
+
+		global $wpdb;
+		$agent_id = absint( $_POST['agent_id'] ?? 0 );
+		$table = GRC_DB::table( 'agents' );
+
+		$agent = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $agent_id ) );
+		if ( ! $agent ) {
+			wp_die( 'Agent not found.' );
+		}
+
+		$new_status = ( 'active' === $agent->status ) ? 'suspended' : 'active';
+		$wpdb->update( $table, array(
+			'status'     => $new_status,
+			'updated_at' => current_time( 'mysql' ),
+		), array( 'id' => $agent_id ) );
+
+		self::audit_log( 'agent', $agent_id, 'status_changed', array( 'new_status' => $new_status ) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=grc-agents&status_updated=1' ) );
 		exit;
 	}
 

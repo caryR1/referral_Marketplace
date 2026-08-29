@@ -21,16 +21,19 @@ $segments = $wpdb->get_results( "SELECT * FROM {$segments_table} ORDER BY name" 
 	<?php if ( ! empty( $_GET['segment_updated'] ) ) : ?>
 		<div class="notice notice-success"><p>Segment assignment updated.</p></div>
 	<?php endif; ?>
+	<?php if ( ! empty( $_GET['status_updated'] ) ) : ?>
+		<div class="notice notice-success"><p>Agent status updated.</p></div>
+	<?php endif; ?>
 
 	<table class="wp-list-table widefat fixed striped">
 		<thead>
 			<tr>
-				<th>Referral Code</th><th>WP User</th><th>Leads Sent</th><th>Converted</th><th>Conversion Rate</th><th>Status</th><th>Segment</th>
+				<th>Referral Code</th><th>WP User</th><th>Leads Sent</th><th>Converted</th><th>Conversion Rate</th><th>Status</th><th>Segment</th><th>Action</th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php if ( empty( $agents ) ) : ?>
-				<tr><td colspan="7">No agents yet.</td></tr>
+				<tr><td colspan="8">No agents yet.</td></tr>
 			<?php endif; ?>
 			<?php foreach ( $agents as $a ) :
 				$user = get_userdata( $a->user_id );
@@ -55,6 +58,14 @@ $segments = $wpdb->get_results( "SELECT * FROM {$segments_table} ORDER BY name" 
 								<?php endforeach; ?>
 							</select>
 							<noscript><button type="submit" class="button">Update</button></noscript>
+						</form>
+					</td>
+					<td>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo 'active' === $a->status ? 'Suspend' : 'Reactivate'; ?> this agent?');">
+							<?php wp_nonce_field( 'grc_toggle_agent_status' ); ?>
+							<input type="hidden" name="action" value="grc_toggle_agent_status">
+							<input type="hidden" name="agent_id" value="<?php echo esc_attr( $a->id ); ?>">
+							<button type="submit" class="button"><?php echo 'active' === $a->status ? 'Suspend' : 'Reactivate'; ?></button>
 						</form>
 					</td>
 				</tr>
