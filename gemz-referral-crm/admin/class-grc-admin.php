@@ -170,8 +170,11 @@ class GRC_Admin {
 			if ( false === $result ) {
 				wp_die( 'Database error saving partner: ' . esc_html( $wpdb->last_error ) );
 			}
-			self::audit_log( 'partner', $wpdb->insert_id, 'created', $data );
+			$partner_id = $wpdb->insert_id;
+			self::audit_log( 'partner', $partner_id, 'created', $data );
 		}
+
+		GRC_Roles::provision_partner_account( $partner_id );
 
 		wp_safe_redirect( admin_url( 'admin.php?page=grc-partners&saved=1' ) );
 		exit;

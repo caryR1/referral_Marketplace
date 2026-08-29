@@ -58,6 +58,10 @@ class GRC_Agent_Portal {
 				<p class="gemz-portal-success">Your payment info was saved.</p>
 			<?php endif; ?>
 
+			<?php if ( current_user_can( 'grc_view_own_deals' ) ) : ?>
+				<p class="gemz-portal-hint"><a href="<?php echo esc_url( home_url( '/partner-portal/' ) ); ?>">Switch to your Partner Dashboard &rarr;</a></p>
+			<?php endif; ?>
+
 			<div class="gemz-portal-stats">
 				<div class="gemz-stat-card">
 					<span class="gemz-stat-label">Your referral code</span>

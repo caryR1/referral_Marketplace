@@ -166,6 +166,7 @@ class GRC_REST_API {
 				continue;
 			}
 			$new_id = $wpdb->insert_id;
+			GRC_Roles::provision_partner_account( $new_id );
 
 			$added[] = array( 'id' => $new_id, 'name' => $name, 'industry' => $industry, 'commission_amount' => $commission );
 			$known[] = array( 'website' => $norm_website, 'name' => $norm_name ); // prevents dupes within this same batch
@@ -274,7 +275,17 @@ class GRC_REST_API {
 
 		wp_set_current_user( $user->ID );
 
-		$redirect = home_url( '/agent-portal/' );
+		// A person can hold both roles at once (e.g. an agent who is also
+		// a fulfillment partner) - default to the agent portal when both
+		// apply; each portal shows a link to the other when the logged-in
+		// user holds that role too, so nothing is ever unreachable.
+		if ( in_array( GRC_Roles::AGENT_ROLE, (array) $user->roles, true ) ) {
+			$redirect = home_url( '/agent-portal/' );
+		} elseif ( in_array( GRC_Roles::PARTNER_ROLE, (array) $user->roles, true ) ) {
+			$redirect = home_url( '/partner-portal/' );
+		} else {
+			$redirect = home_url( '/' );
+		}
 
 		return rest_ensure_response( array( 'success' => true, 'redirect' => $redirect ) );
 	}

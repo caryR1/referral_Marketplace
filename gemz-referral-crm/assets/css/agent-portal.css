@@ -112,3 +112,34 @@
 .gemz-payment-form .gemz-btn {
 	margin-top: 20px;
 }
+
+.gemz-portal-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: var(--gemz-white);
+	border: 1px solid var(--gemz-line);
+	border-radius: var(--gemz-radius);
+	overflow: hidden;
+	box-shadow: var(--gemz-shadow);
+}
+
+.gemz-portal-table th,
+.gemz-portal-table td {
+	text-align: left;
+	padding: 12px 16px;
+	font-size: 14px;
+	border-bottom: 1px solid var(--gemz-line);
+}
+
+.gemz-portal-table th {
+	background: var(--gemz-bg);
+	color: var(--gemz-slate);
+	font-weight: 600;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.gemz-portal-table tr:last-child td {
+	border-bottom: none;
+}

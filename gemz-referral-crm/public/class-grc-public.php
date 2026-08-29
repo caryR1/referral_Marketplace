@@ -80,8 +80,9 @@ class GRC_Public {
 		$has_signup  = has_shortcode( $content, 'gemz_agent_signup' );
 		$has_login   = has_shortcode( $content, 'gemz_agent_login' );
 		$has_claim   = has_shortcode( $content, 'gemz_claim_cashback' );
+		$has_partner_dashboard = has_shortcode( $content, 'gemz_partner_dashboard' );
 
-		if ( ! $has_form && ! $has_browser && ! $has_portal && ! $has_signup && ! $has_login && ! $has_claim ) {
+		if ( ! $has_form && ! $has_browser && ! $has_portal && ! $has_signup && ! $has_login && ! $has_claim && ! $has_partner_dashboard ) {
 			return;
 		}
 
@@ -109,6 +110,10 @@ class GRC_Public {
 
 		if ( $has_portal ) {
 			wp_enqueue_script( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/js/agent-portal.js', array(), GRC_VERSION, true );
+			wp_enqueue_style( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/css/agent-portal.css', array( 'grc-brand-tokens' ), GRC_VERSION );
+		}
+
+		if ( $has_partner_dashboard ) {
 			wp_enqueue_style( 'grc-agent-portal', GRC_PLUGIN_URL . 'assets/css/agent-portal.css', array( 'grc-brand-tokens' ), GRC_VERSION );
 		}
 
